@@ -1,0 +1,42 @@
+import { Text } from '@mantine/core';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
+import type { ReactNode } from 'react';
+
+import type { BackupEntry } from './backup';
+
+interface ConfirmOptions {
+  title: string;
+  message: ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+}
+
+/** Окно «Точно?»: true — подтвердили, false — отменили или закрыли. */
+export function confirmAction({ title, message, confirmLabel, danger }: ConfirmOptions): Promise<boolean> {
+  return new Promise((resolve) => {
+    modals.openConfirmModal({
+      title: <Text fw={600}>{title}</Text>,
+      children: <div>{message}</div>,
+      labels: { confirm: confirmLabel, cancel: 'Отмена' },
+      confirmProps: { color: danger ? 'red' : undefined },
+      radius: 'lg',
+      centered: true,
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+      onClose: () => resolve(false), // после onConfirm уже ничего не меняет
+    });
+  });
+}
+
+/** Сообщение после записи: сделан ли бэкап и куда. */
+export function notifySaved(title: string, backup: BackupEntry | null): void {
+  notifications.show({
+    title,
+    message: backup
+      ? 'Бэкап скачан в «Загрузки» и сохранён во вкладке «Бэкапы».'
+      : 'Бэкап не понадобился: раньше данных не было.',
+    color: 'teal',
+    autoClose: 6000,
+  });
+}
