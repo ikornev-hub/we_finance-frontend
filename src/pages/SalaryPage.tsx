@@ -8,9 +8,11 @@ import {
   IconInfoCircle,
   IconPlus,
   IconSparkles,
+  IconUserDollar,
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { ApiError } from '../api/client';
 import { salaryApi } from '../api/endpoints';
 import type { Absence, AbsenceKind, SalaryProfile, SalaryTerms, WhatIfOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
@@ -42,6 +44,39 @@ export function SalaryPage({ section }: { section: SalarySection }) {
   }
 }
 
+/** 404 от бэкенда = профиль ещё не сохраняли. Для человека это не ошибка, а «первый запуск». */
+function isNoProfile(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
+
+/** Подсказка вместо ошибки: профиля нет — вот что сделать. */
+function NoProfileNotice({ onProfilePage }: { onProfilePage?: boolean }) {
+  return (
+    <Alert color="blue" radius="lg" variant="light" icon={<IconInfoCircle size={18} />} title="Профиль ещё не сохранён">
+      <Stack gap="xs">
+        <Text size="sm">
+          {onProfilePage
+            ? 'На бэкенде пока нет твоего профиля — загружать нечего. Заполни форму ниже (сейчас в ней учебный пример) и нажми «Сохранить на бэкенде».'
+            : 'Этот раздел считает по сохранённому профилю, а его пока нет. Сначала заполни и сохрани профиль.'}
+        </Text>
+        {!onProfilePage && (
+          <div>
+            <Button size="xs" variant="light" color="blue" leftSection={<IconUserDollar size={14} />} onClick={() => (window.location.hash = '#salary/profile')}>
+              Заполнить профиль
+            </Button>
+          </div>
+        )}
+      </Stack>
+    </Alert>
+  );
+}
+
+/** Ошибка или подсказка «профиля нет» — в зависимости от ответа. */
+function ProfileError({ error }: { error: unknown }) {
+  if (!error) return null;
+  return isNoProfile(error) ? <NoProfileNotice /> : <ErrorAlert error={error} />;
+}
+
 function SaveWarning() {
   return (
     <Alert color="brand" radius="lg" icon={<IconInfoCircle size={18} />} variant="light">
@@ -59,7 +94,8 @@ function ProfileSection() {
   const [profile, setProfileState] = useState<SalaryProfile>(profileDraft);
   const [year, setYear] = useState(EXAMPLE_YEAR);
   const [asOf, setAsOf] = useState('');
-  const load = useAction<SalaryProfile>();
+  const load = useAction<SalaryProfile | null>();
+  const [noProfile, setNoProfile] = useState(false);
   const save = useAction<SalaryProfile>();
   const calc = useAction<YearReportOut>();
 
@@ -69,7 +105,9 @@ function ProfileSection() {
   };
 
   const loadSaved = async () => {
-    const saved = await load.run(() => salaryApi.getProfile());
+    // null — профиля на бэкенде нет: это не ошибка, покажем подсказку.
+    const saved = await load.run(() => salaryApi.getProfile().catch((error) => (isNoProfile(error) ? null : Promise.reject(error))));
+    setNoProfile(saved === null);
     if (saved) {
       setProfile({ ...saved, absences: saved.absences ?? [], history: saved.history ?? [] });
       notifications.show({ title: 'Профиль загружен', message: 'Это сохранённый на бэкенде профиль.', color: 'teal' });
@@ -123,6 +161,7 @@ function ProfileSection() {
               Сохранить на бэкенде
             </Button>
           </Group>
+          {noProfile && <NoProfileNotice onProfilePage />}
           <ErrorAlert error={load.error} />
           <ErrorAlert error={save.error} />
           <SaveWarning />
@@ -167,11 +206,8 @@ function YearSection() {
           </Button>
         </Group>
         {report.error !== null && (
-          <Stack mt="md" gap="xs">
-            <ErrorAlert error={report.error} />
-            <Text size="xs" c="dimmed">
-              404 — профиль ещё не сохранён: раздел «Профиль» → «Сохранить на бэкенде».
-            </Text>
+          <Stack mt="md">
+            <ProfileError error={report.error} />
           </Stack>
         )}
       </Panel>
@@ -231,7 +267,7 @@ function AbsenceSection() {
             </Button>
           </Group>
           <SaveWarning />
-          <ErrorAlert error={add.error} />
+          <ProfileError error={add.error} />
         </Stack>
       </Panel>
       {add.data && (
@@ -278,11 +314,8 @@ function WhatIfSection() {
           </Button>
         </Group>
         {result.error !== null && (
-          <Stack mt="md" gap="xs">
-            <ErrorAlert error={result.error} />
-            <Text size="xs" c="dimmed">
-              404 — профиль ещё не сохранён. 422 — новые условия должны начинаться позже последних в профиле.
-            </Text>
+          <Stack mt="md">
+            <ProfileError error={result.error} />
           </Stack>
         )}
       </Panel>
