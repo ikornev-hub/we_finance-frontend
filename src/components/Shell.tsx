@@ -125,7 +125,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
       <AppShell.Navbar className={classes.rail}>
         <Stack justify="space-between" h="100%" py="md" align="center">
           <Stack gap={6} align="center">
-            {route.tab.sections.map((section) => {
+            {route.tab.sections.filter((section) => !section.hidden).map((section) => {
               const active = section.id === route.section.id;
               return (
                 <Tooltip key={section.id} label={section.label} position="right" withArrow>

@@ -1,26 +1,27 @@
 import {
   IconBuildingBank,
   IconCalculator,
-  IconCalendarStats,
+  IconChartBar,
   IconCirclePlus,
   IconDatabaseExport,
   IconHeartbeat,
   IconListDetails,
   IconSparkles,
-  IconUserDollar,
-  IconUserMinus,
+  IconUserEdit,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 // Навигация: вкладки сверху, разделы вкладки — иконки в левой колонке. Адрес: #вкладка/раздел[/параметр].
 
-export type TabId = 'salary' | 'loans' | 'calculator' | 'service' | 'backups';
+export type TabId = 'income' | 'loans' | 'calculator' | 'service' | 'backups';
 
 export interface Section {
   id: string;
   label: string;
   icon: ReactNode;
+  /** Не показывать в колонке иконок: на раздел ведёт кнопка со страницы. */
+  hidden?: boolean;
 }
 
 export interface Tab {
@@ -33,13 +34,12 @@ const size = 20;
 
 export const TABS: Tab[] = [
   {
-    id: 'salary',
-    label: 'Зарплата',
+    id: 'income',
+    label: 'Доходы',
     sections: [
-      { id: 'profile', label: 'Профиль и расчёт', icon: <IconUserDollar size={size} /> },
-      { id: 'year', label: 'Отчёт за год', icon: <IconCalendarStats size={size} /> },
-      { id: 'absence', label: 'Отсутствие', icon: <IconUserMinus size={size} /> },
+      { id: 'overview', label: 'Отчёт', icon: <IconChartBar size={size} /> },
       { id: 'whatif', label: 'Что если', icon: <IconSparkles size={size} /> },
+      { id: 'data', label: 'Мои данные', icon: <IconUserEdit size={size} />, hidden: true },
     ],
   },
   {

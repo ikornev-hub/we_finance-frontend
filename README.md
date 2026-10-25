@@ -7,7 +7,7 @@ React + TypeScript + Vite + [Mantine](https://mantine.dev). Вид — по ре
 
 | Вкладка | Разделы (иконки слева) | Эндпоинты |
 |---|---|---|
-| **Зарплата** | Профиль и расчёт · Отчёт за год · Отсутствие · Что если | `POST /salary/calculate`, `GET`/`PUT /salary/profile`, `POST /salary/absences`, `GET /salary/{year}`, `POST /salary/{year}/what-if` |
+| **Доходы** | Отчёт (главная) · Что если; «Мои данные» — по кнопке «Актуализировать данные» | `GET /salary/{year}`, `GET`/`PUT /salary/profile`, `POST /salary/{year}/what-if` |
 | **Кредиты** | Мои кредиты (→ карточка, ЧДП) · Новый кредит | `GET`/`POST /loans`, `GET /loans/{id}`, `POST /loans/{id}/prepayments/preview`, `POST /loans/{id}/prepayments` |
 | **Калькулятор** | График и полный расчёт с ЧДП | `POST /calculator/schedule`, `POST /calculator/calculate` |
 | **Сервис** | Состояние, версия, округление | `GET /health`, `GET /version`, `GET /money/round` |
