@@ -1,6 +1,7 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
 import { BackupsPage } from './pages/BackupsPage';
+import { HomePage } from './pages/HomePage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { IncomePage, type IncomeSection } from './pages/IncomePage';
 import { LoansPage, type LoansSection } from './pages/LoansPage';
@@ -18,14 +19,14 @@ export function App() {
     case 'calculator':
       page = <CalculatorPage />;
       break;
-    case 'service':
-      page = <ServicePage />;
+    case 'income':
+      page = <IncomePage section={route.section.id as IncomeSection} />;
       break;
-    case 'backups':
-      page = <BackupsPage />;
+    case 'system':
+      page = route.section.id === 'backups' ? <BackupsPage /> : <ServicePage />;
       break;
     default:
-      page = <IncomePage section={route.section.id as IncomeSection} />;
+      page = <HomePage />;
   }
 
   // key: при смене раздела страница монтируется заново — без «застрявших» результатов прошлого раздела.

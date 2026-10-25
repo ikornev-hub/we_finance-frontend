@@ -5,13 +5,15 @@ React + TypeScript + Vite + [Mantine](https://mantine.dev). Вид — по ре
 
 ## Что есть
 
-| Вкладка | Разделы (иконки слева) | Эндпоинты |
+Экраны построены от пользовательских сценариев — [docs/user-scenarios.md](docs/user-scenarios.md).
+
+| Вкладка | Что внутри | Эндпоинты |
 |---|---|---|
-| **Доходы** | Отчёт (главная) · Что если; «Мои данные» — по кнопке «Актуализировать данные» | `GET /salary/{year}`, `GET`/`PUT /salary/profile`, `POST /salary/{year}/what-if` |
+| **Главная** | этот месяц: доход, платежи по кредитам, что останется; лента ближайших событий; кредиты коротко | `GET /salary/{year}`, `GET /loans`, `GET /loans/{id}` |
+| **Доходы** | Отчёт (главная раздела), «Отпуск или больничный», «Что если»; «Мои данные» — по кнопке «Актуализировать данные» | `GET /salary/{year}`, `GET`/`PUT /salary/profile`, `POST /salary/absences`, `POST /salary/{year}/what-if` |
 | **Кредиты** | Мои кредиты (→ карточка, ЧДП) · Новый кредит | `GET`/`POST /loans`, `GET /loans/{id}`, `POST /loans/{id}/prepayments/preview`, `POST /loans/{id}/prepayments` |
-| **Калькулятор** | График и полный расчёт с ЧДП | `POST /calculator/schedule`, `POST /calculator/calculate` |
-| **Сервис** | Состояние, версия, округление | `GET /health`, `GET /version`, `GET /money/round` |
-| **Бэкапы** | Копии перед записью, восстановление профиля | — |
+| **Калькулятор** | график и полный расчёт с ЧДП | `POST /calculator/schedule`, `POST /calculator/calculate` |
+| ⚙ **Система** (шестерёнка в шапке) | состояние, версия, округление; бэкапы профиля доходов | `GET /health`, `GET /version`, `GET /money/round` |
 
 Формы заполнены **учебными примерами** из требований: можно сразу жать кнопки.
 

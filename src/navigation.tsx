@@ -5,6 +5,7 @@ import {
   IconCirclePlus,
   IconDatabaseExport,
   IconHeartbeat,
+  IconHome,
   IconListDetails,
   IconSparkles,
   IconUserEdit,
@@ -14,7 +15,7 @@ import type { ReactNode } from 'react';
 
 // Навигация: вкладки сверху, разделы вкладки — иконки в левой колонке. Адрес: #вкладка/раздел[/параметр].
 
-export type TabId = 'income' | 'loans' | 'calculator' | 'service' | 'backups';
+export type TabId = 'home' | 'income' | 'loans' | 'calculator' | 'system';
 
 export interface Section {
   id: string;
@@ -28,11 +29,18 @@ export interface Tab {
   id: TabId;
   label: string;
   sections: Section[];
+  /** Не показывать в верхних вкладках: вход — по шестерёнке в шапке. */
+  hidden?: boolean;
 }
 
 const size = 20;
 
 export const TABS: Tab[] = [
+  {
+    id: 'home',
+    label: 'Главная',
+    sections: [{ id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> }],
+  },
   {
     id: 'income',
     label: 'Доходы',
@@ -56,14 +64,13 @@ export const TABS: Tab[] = [
     sections: [{ id: 'main', label: 'Калькулятор кредита', icon: <IconCalculator size={size} /> }],
   },
   {
-    id: 'service',
-    label: 'Сервис',
-    sections: [{ id: 'main', label: 'Состояние и утилиты', icon: <IconHeartbeat size={size} /> }],
-  },
-  {
-    id: 'backups',
-    label: 'Бэкапы',
-    sections: [{ id: 'main', label: 'Бэкапы', icon: <IconDatabaseExport size={size} /> }],
+    id: 'system',
+    label: 'Система',
+    hidden: true,
+    sections: [
+      { id: 'status', label: 'Состояние и утилиты', icon: <IconHeartbeat size={size} /> },
+      { id: 'backups', label: 'Бэкапы', icon: <IconDatabaseExport size={size} /> },
+    ],
   },
 ];
 

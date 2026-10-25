@@ -1,6 +1,9 @@
-import { Alert, Button, Group, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import {
   IconArrowLeft,
+  IconBeach,
   IconChevronLeft,
   IconChevronRight,
   IconDeviceFloppy,
@@ -13,7 +16,7 @@ import { useEffect, useState } from 'react';
 
 import { ApiError } from '../api/client';
 import { salaryApi } from '../api/endpoints';
-import type { SalaryProfile, SalaryTerms, WhatIfOut, YearReportOut } from '../api/types';
+import type { Absence, AbsenceKind, SalaryProfile, SalaryTerms, WhatIfOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { DateField, IntField, MoneyField } from '../components/fields';
@@ -23,6 +26,7 @@ import { WhatIfView } from '../components/salary/ReportView';
 import { snapshotProfile, withBackup } from '../lib/backup';
 import { confirmAction, notifySaved } from '../lib/confirm';
 import { EXAMPLE_PROFILE, EXAMPLE_WHAT_IF, clone } from '../lib/examples';
+import { ABSENCE_KIND, date, signedMoney, todayIso } from '../lib/format';
 import { useAction } from '../lib/useAction';
 
 export type IncomeSection = 'overview' | 'whatif' | 'data';
@@ -89,10 +93,25 @@ function OverviewSection() {
   const [year, setYear] = useState(THIS_YEAR);
   const report = useAction<YearReportOut>();
   const { run } = report;
+  const [absenceOpen, absenceModal] = useDisclosure(false);
 
   useEffect(() => {
     void run(() => salaryApi.year(year));
   }, [run, year]);
+
+  const afterAbsence = async (before: string | null) => {
+    absenceModal.close();
+    const updated = await run(() => salaryApi.year(year));
+    if (updated && before !== null) {
+      const change = (Math.round(Number(updated.net) * 100) - Math.round(Number(before) * 100)) / 100;
+      notifications.show({
+        title: 'Отсутствие добавлено',
+        message: `На руки за ${year}: ${signedMoney(change.toFixed(2))}`,
+        color: 'teal',
+        autoClose: 8000,
+      });
+    }
+  };
 
   return (
     <Stack gap="lg">
@@ -100,6 +119,9 @@ function OverviewSection() {
         <PageHeader title="Доходы" subtitle="Сколько и когда приходит: зарплата, отпускные, больничные — за вычетом НДФЛ." />
         <Group gap="sm">
           <YearSwitch year={year} onChange={setYear} />
+          <Button variant="default" leftSection={<IconBeach size={16} />} onClick={absenceModal.open} disabled={!report.data}>
+            Отпуск или больничный
+          </Button>
           <Button variant="default" leftSection={<IconSparkles size={16} />} onClick={go('whatif')}>
             Что если
           </Button>
@@ -110,6 +132,55 @@ function OverviewSection() {
       </Group>
       <ReportError error={report.error} />
       {report.data && <YearOverview report={report.data} />}
+      <Modal opened={absenceOpen} onClose={absenceModal.close} title="Отпуск, больничный или день без оплаты" radius="lg" centered>
+        <AbsenceForm netBefore={report.data?.net ?? null} onDone={afterAbsence} />
+      </Modal>
+    </Stack>
+  );
+}
+
+const KIND_OPTIONS = Object.entries(ABSENCE_KIND).map(([value, label]) => ({ value, label }));
+
+/** Добавить отсутствие в данные и пересчитать отчёт. Удалить потом можно в «Моих данных». */
+function AbsenceForm({ netBefore, onDone }: { netBefore: string | null; onDone: (netBefore: string | null) => void }) {
+  const today = todayIso();
+  const [absence, setAbsence] = useState<Absence>({ kind: 'vacation', start: today, end: today });
+  const add = useAction<SalaryProfile>();
+
+  const submit = async () => {
+    const saved = await add.run(async () => {
+      const { result } = await withBackup('salary-profile', 'Перед добавлением отсутствия', snapshotProfile, () =>
+        salaryApi.addAbsence(absence),
+      );
+      return result;
+    });
+    if (saved) onDone(netBefore);
+  };
+
+  return (
+    <Stack gap="md">
+      <Select
+        label="Что"
+        data={KIND_OPTIONS}
+        value={absence.kind}
+        allowDeselect={false}
+        onChange={(kind) => kind && setAbsence({ ...absence, kind: kind as AbsenceKind })}
+        radius="md"
+      />
+      <Group grow>
+        <DateField label="С" value={absence.start} onChange={(start) => setAbsence({ ...absence, start })} />
+        <DateField label="По (включительно)" value={absence.end} onChange={(end) => setAbsence({ ...absence, end })} />
+      </Group>
+      <Text size="xs" c="dimmed">
+        {ABSENCE_KIND[absence.kind]} {date(absence.start)} – {date(absence.end)}. Отчёт пересчитается сразу; убрать запись можно в
+        «Моих данных».
+      </Text>
+      <ErrorAlert error={add.error} />
+      <Group justify="flex-end">
+        <Button leftSection={<IconBeach size={16} />} loading={add.loading} onClick={submit}>
+          Добавить
+        </Button>
+      </Group>
     </Stack>
   );
 }

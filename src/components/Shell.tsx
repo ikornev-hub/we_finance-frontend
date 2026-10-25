@@ -13,7 +13,7 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import { useInterval } from '@mantine/hooks';
-import { IconMoon, IconSun } from '@tabler/icons-react';
+import { IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -55,14 +55,14 @@ function useBackendStatus(): Status {
 function StatusPill({ status }: { status: Status }) {
   const color = status.offline ? 'red' : !status.health ? 'gray' : status.health.status === 'ok' ? 'teal' : 'yellow';
   const label = status.offline
-    ? 'Бэкенд не отвечает'
+    ? 'Сервер не отвечает'
     : !status.health
       ? 'Проверяю…'
       : status.health.status === 'ok'
-        ? 'Бэкенд работает'
-        : `API работает, БД: ${status.health.db}`;
+        ? 'Всё работает'
+        : 'База данных недоступна';
   return (
-    <Tooltip label={status.offline ? 'Запусти uvicorn на 127.0.0.1:8000' : 'GET /health, раз в 15 секунд'}>
+    <Tooltip label={status.offline ? 'Сервер не отвечает — проверь, что стенд запущен' : 'Проверяется раз в 15 секунд'}>
       <Group gap={8} className={classes.pill} wrap="nowrap">
         <Box className={classes.dot} bg={`${color}.6`} />
         <Text size="xs" fw={500} visibleFrom="sm">
@@ -113,12 +113,26 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           <SegmentedControl
             radius="xl"
             size="sm"
-            value={route.tab.id}
+            value={route.tab.hidden ? '' : route.tab.id}
             onChange={(value) => (window.location.hash = href(value as TabId))}
-            data={TABS.map((tab) => ({ value: tab.id, label: tab.label }))}
+            data={TABS.filter((tab) => !tab.hidden).map((tab) => ({ value: tab.id, label: tab.label }))}
             className={classes.tabs}
           />
-          <StatusPill status={status} />
+          <Group gap="xs" wrap="nowrap">
+            <StatusPill status={status} />
+            <Tooltip label="Система: состояние и бэкапы">
+              <ActionIcon
+                variant={route.tab.id === 'system' ? 'light' : 'subtle'}
+                color="gray"
+                size="lg"
+                radius="xl"
+                onClick={() => (window.location.hash = href('system'))}
+                aria-label="Система"
+              >
+                <IconSettings size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
       </AppShell.Header>
 
