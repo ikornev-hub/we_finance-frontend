@@ -2,7 +2,7 @@
 // Правило: не удалось снять копию — запись не выполняется.
 
 import { ApiError } from '../api/client';
-import { loansApi, salaryApi } from '../api/endpoints';
+import { salaryApi } from '../api/endpoints';
 import type { LoanDetailOut, LoanSummaryOut, SalaryProfile } from '../api/types';
 
 export type BackupKind = 'salary-profile' | 'loans';
@@ -98,14 +98,6 @@ export async function snapshotProfile(): Promise<SalaryProfile | null> {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
-}
-
-/** Все кредиты: список и полная карточка каждого. */
-export async function snapshotLoans(): Promise<LoansSnapshot | null> {
-  const loans = await loansApi.list();
-  if (loans.length === 0) return null;
-  const details = await Promise.all(loans.map((loan) => loansApi.detail(loan.id)));
-  return { loans, details };
 }
 
 export class BackupFailedError extends Error {

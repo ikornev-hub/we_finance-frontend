@@ -9,8 +9,7 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { AsOfField } from '../components/fields';
 import { LoanForm, MODE_OPTIONS, PrepaymentFields } from '../components/loans/LoanForm';
 import { CalculationView, PreviewView } from '../components/loans/LoanViews';
-import { snapshotLoans, withBackup } from '../lib/backup';
-import { confirmAction, notifySaved } from '../lib/confirm';
+import { confirmAction, notifyDone } from '../lib/confirm';
 import { EXAMPLE_LOAN, EXAMPLE_PREPAYMENT, clone } from '../lib/examples';
 import { date, money } from '../lib/format';
 import { useAction } from '../lib/useAction';
@@ -22,12 +21,12 @@ export function LoansPage({ section, param }: { section: LoansSection; param?: s
   return param ? <DetailSection id={param} /> : <ListSection />;
 }
 
-function BackendFileNote() {
+function StorageNote() {
   return (
     <Alert color="brand" radius="lg" icon={<IconInfoCircle size={18} />} variant="light">
       <Text size="sm">
-        Кредиты пишутся в файл из <b>CREDIT_DATA_PATH</b> бэкенда. Удалить кредит или ЧДП через API нельзя — перед
-        каждой записью все кредиты скачиваются бэкапом.
+        Кредиты хранятся в базе бэкенда (Postgres). Кредит и ЧДП после записи не меняются и не удаляются — история
+        платежей остаётся такой, какой её внесли. Копии базы — забота сервера, а не браузера.
       </Text>
     </Alert>
   );
@@ -115,8 +114,8 @@ function DetailSection({ id }: { id: string }) {
       title: 'Внести ЧДП? Отменить будет нельзя',
       message: (
         <Text size="sm">
-          {money(prepayment.amount)} на {date(prepayment.date)}, «{mode}». По требованиям ЧДП нельзя удалить или изменить.
-          Перед записью все кредиты скачаются бэкапом.
+          {money(prepayment.amount)} на {date(prepayment.date)}, «{mode}». По требованиям ЧДП нельзя удалить или изменить:
+          он навсегда останется в истории кредита.
         </Text>
       ),
       confirmLabel: 'Внести ЧДП',
@@ -124,10 +123,8 @@ function DetailSection({ id }: { id: string }) {
     });
     if (!ok) return;
     const updated = await add.run(async () => {
-      const { result, backup } = await withBackup('loans', `Перед ЧДП в кредит «${detail.data?.name ?? id}»`, snapshotLoans, () =>
-        loansApi.addPrepayment(id, prepayment),
-      );
-      notifySaved('ЧДП внесён', backup);
+      const result = await loansApi.addPrepayment(id, prepayment);
+      notifyDone('ЧДП внесён', 'Записан в базу и добавлен в историю кредита.');
       return result;
     });
     if (updated) {
@@ -168,7 +165,7 @@ function DetailSection({ id }: { id: string }) {
                 Внести ЧДП
               </Button>
             </Group>
-            <BackendFileNote />
+            <StorageNote />
             <ErrorAlert error={preview.error} />
             <ErrorAlert error={add.error} />
             {preview.data && <PreviewView preview={preview.data} />}
@@ -190,16 +187,15 @@ function CreateSection() {
       title: 'Создать кредит на бэкенде?',
       message: (
         <Text size="sm">
-          «{loan.name}» на {money(loan.principal)} сохранится в файл кредитов. Удалить его через API нельзя. Перед записью
-          текущие кредиты скачаются бэкапом.
+          «{loan.name}» на {money(loan.principal)} сохранится в базу. Удалить или изменить его через API нельзя.
         </Text>
       ),
       confirmLabel: 'Создать',
     });
     if (!ok) return;
     const created = await create.run(async () => {
-      const { result, backup } = await withBackup('loans', `Перед созданием кредита «${loan.name}»`, snapshotLoans, () => loansApi.create(loan));
-      notifySaved('Кредит создан', backup);
+      const result = await loansApi.create(loan);
+      notifyDone('Кредит создан', 'Записан в базу.');
       return result;
     });
     if (created) window.location.hash = `#loans/list/${created.id}`;
@@ -219,7 +215,7 @@ function CreateSection() {
               Создать кредит
             </Button>
           </Group>
-          <BackendFileNote />
+          <StorageNote />
           <ErrorAlert error={create.error} />
         </Stack>
       </Panel>

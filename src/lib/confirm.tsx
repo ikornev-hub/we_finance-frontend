@@ -30,6 +30,11 @@ export function confirmAction({ title, message, confirmLabel, danger }: ConfirmO
 }
 
 /** Сообщение после записи: сделан ли бэкап и куда. */
+/** Запись прошла (без бэкапа: данные в базе). */
+export function notifyDone(title: string, message: string): void {
+  notifications.show({ title, message, color: 'teal', autoClose: 6000 });
+}
+
 export function notifySaved(title: string, backup: BackupEntry | null): void {
   notifications.show({
     title,
