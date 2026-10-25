@@ -54,6 +54,14 @@ BACKEND_URL=http://127.0.0.1:8010 npm run dev
 
 Остановить — `Ctrl+C` в обоих терминалах.
 
+## Образ (для compose всего приложения)
+
+```bash
+docker build -t we-finance-frontend .
+```
+
+Внутри: сборка Vite → nginx. nginx отдаёт статику и проксирует `/api`, `/health`, `/version` на `BACKEND_URL` (по умолчанию `http://backend:8000` — имя сервиса в compose). Порт контейнера — 80.
+
 ## Команды
 
 | Команда | Что делает |
