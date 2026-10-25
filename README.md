@@ -27,40 +27,32 @@ React + TypeScript + Vite + [Mantine](https://mantine.dev). Вид — по ре
 
 ## Запуск
 
-Нужно два терминала: бэкенд и фронт. Фронт ходит на бэкенд через прокси Vite (`/api`, `/health`, `/version` → `127.0.0.1:8000`), CORS не нужен.
+Два терминала **Git Bash**: бэкенд и фронт. Фронт ходит на бэкенд через прокси Vite (`/api`, `/health`, `/version`), CORS не нужен.
+Порт 8000 обычно занят стендом qa, поэтому бэкенд для фронта — на **8010**.
 
-**Терминал 1 — бэкенд** (ветка с зарплатой):
+**Терминал 1 — бэкенд** (ветка `feat/salary`: зарплаты в `main` пока нет, кредиты одинаковые):
 
-```powershell
-cd D:\Code\we_finance\we_finance-backend
+```bash
+cd /d/Code/we_finance/we_finance-backend
 git switch feat/salary
-.venv\Scripts\activate
-uvicorn we_finance.api:app --reload --env-file .env
+cp data/credit.local.json data/credit.real-play.local.json   # копия реальных данных: пиши в неё сколько хочешь
+CREDIT_DATA_PATH=data/credit.real-play.local.json .venv/Scripts/uvicorn.exe we_finance.api:app --reload --env-file .env --port 8010
 ```
+
+Переменная перед командой главнее `.env`. Без неё бэкенд пишет в настоящий `data/credit.local.json`. Файлы `data/*.local.json` в `.gitignore`.
+Начать заново — снова `cp`. Зарплату так же: `SALARY_DATA_PATH=data/salary.real-play.local.json`.
 
 **Терминал 2 — фронт:**
 
-```powershell
-cd D:\Code\we_finance\we_finance-frontend
-npm install        # первый раз и после смены зависимостей
-npm run dev
+```bash
+cd /d/Code/we_finance/we_finance-frontend
+npm install                                       # первый раз и после смены зависимостей
+BACKEND_URL=http://127.0.0.1:8010 npm run dev
 ```
 
-Открыть **http://127.0.0.1:5173**. Справа в шапке — статус бэкенда: зелёный «Бэкенд работает», жёлтый «API работает, БД: unavailable» (это нормально без Postgres: зарплата и кредиты в JSON-файлах), красный «Бэкенд не отвечает» — не запущен uvicorn.
+Открыть **http://127.0.0.1:5173**. Справа в шапке — статус бэкенда: жёлтый «API работает, БД: unavailable» — нормально без Postgres (кредиты и зарплата в JSON-файлах); красный «Бэкенд не отвечает» — не запущен uvicorn или не тот `BACKEND_URL`.
 
-### Песочница: играть, не трогая свои данные
-
-`--env-file .env` указывает на твои `data/*.local.json`. Чтобы кликать по учебным копиям, в **терминале 1** перед `uvicorn`:
-
-```powershell
-Copy-Item data\salary.example.json data\salary.play.local.json
-Copy-Item data\credit.example.json data\credit.play.local.json
-$env:SALARY_DATA_PATH = "data/salary.play.local.json"
-$env:CREDIT_DATA_PATH = "data/credit.play.local.json"
-uvicorn we_finance.api:app --reload --env-file .env
-```
-
-Переменные из терминала главнее `.env`. Файлы `*.local.json` в `.gitignore`. Вернуться к своим данным — закрыть терминал (или `Remove-Item Env:SALARY_DATA_PATH, Env:CREDIT_DATA_PATH`) и запустить `uvicorn` заново.
+Остановить — `Ctrl+C` в обоих терминалах.
 
 ## Команды
 
@@ -69,7 +61,7 @@ uvicorn we_finance.api:app --reload --env-file .env
 | `npm run dev` | дев-сервер на 127.0.0.1:5173 с прокси на бэкенд |
 | `npm run typecheck` | проверка типов TypeScript |
 | `npm run build` | типы + сборка в `dist/` |
-| `BACKEND_URL=http://127.0.0.1:8001 npm run dev` | бэкенд на другом адресе (в PowerShell: `$env:BACKEND_URL = "..."`) |
+| `BACKEND_URL=http://127.0.0.1:8010 npm run dev` | бэкенд на другом адресе (по умолчанию 8000) |
 
 ## Устройство
 
