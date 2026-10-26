@@ -259,7 +259,7 @@ function OperationRow({
           <ErrorAlert error={save.error} />
         </Stack>
       </Table.Td>
-      <Table.Td ta="right" fw={600} c={Number(operation.amount) > 0 ? 'teal' : undefined}>
+      <Table.Td ta="right" fw={600} c={Number(operation.amount) > 0 ? 'teal' : undefined} style={{ whiteSpace: 'nowrap' }}>
         {money(operation.amount)}
       </Table.Td>
       <Table.Td>
