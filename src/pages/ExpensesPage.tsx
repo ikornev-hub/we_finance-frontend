@@ -30,7 +30,7 @@ import { useEffect, useState } from 'react';
 import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
-import { ErrorAlert } from '../components/ErrorAlert';
+import { ErrorAlert, errorText } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { ForecastPanel, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
@@ -449,6 +449,8 @@ function CategoriesSection() {
         notifications.show({ color: 'yellow', title: 'Пример', message: 'Изменения заработают, когда backend научится управлять категориями.' });
         return false;
       }
+      // Плашка ошибки — вверху страницы, а правят обычно ниже: дублируем уведомлением.
+      notifications.show({ color: 'red', title: 'Не сохранилось', message: errorText(error) });
       void change.run(() => Promise.reject(error));
       return false;
     }
@@ -527,7 +529,16 @@ function CategoriesSection() {
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    {!NO_LIMIT.has(category.system_code ?? '') && <LimitEditor category={category} onSave={(limit) => run(() => expensesApi.updateCategory(category.id, limit))} />}
+                    {!NO_LIMIT.has(category.system_code ?? '') && (
+                      <LimitEditor
+                        category={category}
+                        onSave={(limit, text) =>
+                          void run(() => expensesApi.updateCategory(category.id, limit)).then(
+                            (ok) => ok && notifications.show({ color: 'teal', title: 'Граница сохранена', message: `${category.name}: ${text}` }),
+                          )
+                        }
+                      />
+                    )}
                   </Table.Td>
                   <Table.Td>
                     {!category.system_code && (
@@ -583,16 +594,25 @@ function NameInput({ name, bold = false, onSave }: { name: string; bold?: boolea
 }
 
 /** Граница категории: в % от располагаемого или суммой. Пусто — без границы. */
-function LimitEditor({ category, onSave }: { category: ExpenseCategory; onSave: (limit: { target_share: string | null } | { target_amount: string | null }) => void }) {
+type Limit = { target_share: string | null } | { target_amount: string | null };
+
+/**
+ * Граница категории: в % от располагаемого или суммой. Пусто — без границы.
+ * Сохраняется по Enter или при уходе из поля; без изменений сервер не дёргаем.
+ */
+function LimitEditor({ category, onSave }: { category: ExpenseCategory; onSave: (limit: Limit, text: string) => void }) {
   const [mode, setMode] = useState<'share' | 'amount'>(category.target_amount ? 'amount' : 'share');
   const current = mode === 'amount' ? (category.target_amount ? Number(category.target_amount) : undefined) : category.target_share ? Number(category.target_share) * 100 : undefined;
   const save = (raw: string) => {
     const value = raw.replace(/[^\d.,]/g, '').replace(',', '.');
-    if (!value) {
-      onSave({ target_share: null });
+    const number = value ? Number(value) : undefined;
+    if (number === current) return;
+    if (number === undefined) {
+      onSave({ target_share: null }, 'без границы');
       return;
     }
-    onSave(mode === 'amount' ? { target_amount: Number(value).toFixed(2) } : { target_share: String(Number(value) / 100) });
+    if (mode === 'amount') onSave({ target_amount: number.toFixed(2) }, money(number.toFixed(2)));
+    else onSave({ target_share: String(number / 100) }, `${number.toLocaleString('ru-RU')} % располагаемого`);
   };
   return (
     <Group gap={6} wrap="nowrap">
@@ -603,11 +623,17 @@ function LimitEditor({ category, onSave }: { category: ExpenseCategory; onSave: 
         w={130}
         min={0}
         max={mode === 'share' ? 100 : undefined}
+        clampBehavior="strict"
+        allowNegative={false}
+        decimalScale={2}
         thousandSeparator=" "
         decimalSeparator=","
         suffix={mode === 'share' ? ' %' : ' ₽'}
         defaultValue={current}
         placeholder="без границы"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+        }}
         onBlur={(event) => save(event.currentTarget.value)}
       />
     </Group>
