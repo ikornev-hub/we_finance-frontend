@@ -1,9 +1,21 @@
-import { Alert, Button, Group, Stack, Table, Text } from '@mantine/core';
-import { IconArrowLeft, IconChevronRight, IconEye, IconInfoCircle, IconPlus, IconRefresh, IconCash } from '@tabler/icons-react';
+import { Alert, Badge, Button, Group, SegmentedControl, Stack, Table, Text } from '@mantine/core';
+import {
+  IconArchive,
+  IconArrowLeft,
+  IconCash,
+  IconChevronRight,
+  IconCircleCheck,
+  IconEye,
+  IconInfoCircle,
+  IconPlus,
+  IconRefresh,
+  IconRestore,
+  IconTrash,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { loansApi } from '../api/endpoints';
-import type { LoanCreateIn, LoanDetailOut, LoanSummaryOut, Prepayment, PreviewOut } from '../api/types';
+import type { LoanCreateIn, LoanDetailOut, LoanStatus, LoanSummaryOut, Prepayment, PreviewOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { AsOfField } from '../components/fields';
@@ -14,11 +26,12 @@ import { EXAMPLE_LOAN, EXAMPLE_PREPAYMENT, clone } from '../lib/examples';
 import { date, money } from '../lib/format';
 import { useAction } from '../lib/useAction';
 
-export type LoansSection = 'list' | 'create';
+export type LoansSection = 'list' | 'archive' | 'create';
 
 export function LoansPage({ section, param }: { section: LoansSection; param?: string }) {
   if (section === 'create') return <CreateSection />;
-  return param ? <DetailSection id={param} /> : <ListSection />;
+  if (param) return <DetailSection id={param} back={section} />;
+  return section === 'archive' ? <ArchiveSection /> : <ListSection />;
 }
 
 function StorageNote() {
@@ -34,6 +47,52 @@ function StorageNote() {
 
 // ---------- список ----------
 
+const STATUS_BADGE: Record<LoanStatus, { text: string; color: string }> = {
+  active: { text: 'Активный', color: 'teal' },
+  completed: { text: 'Завершён', color: 'gray' },
+  deleted: { text: 'Удалён', color: 'red' },
+};
+
+function LoansTable({ loans, section }: { loans: LoanSummaryOut[]; section: LoansSection }) {
+  return (
+    <Table highlightOnHover verticalSpacing="sm">
+      <Table.Thead>
+        <Table.Tr>
+          <Table.Th>Название</Table.Th>
+          <Table.Th ta="right">Сумма</Table.Th>
+          <Table.Th ta="right">Остаток</Table.Th>
+          <Table.Th>Закрытие</Table.Th>
+          <Table.Th w={40} />
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {loans.map((loan) => (
+          <Table.Tr key={loan.id} style={{ cursor: 'pointer' }} onClick={() => (window.location.hash = `#loans/${section}/${loan.id}`)}>
+            <Table.Td>
+              <Group gap="xs">
+                <Text fw={600} size="sm">
+                  {loan.name}
+                </Text>
+                {loan.can_complete && (
+                  <Badge variant="light" color="teal" radius="sm" size="sm">
+                    выплачен
+                  </Badge>
+                )}
+              </Group>
+            </Table.Td>
+            <Table.Td ta="right">{money(loan.principal)}</Table.Td>
+            <Table.Td ta="right">{money(loan.balance)}</Table.Td>
+            <Table.Td>{date(loan.close_date)}</Table.Td>
+            <Table.Td>
+              <IconChevronRight size={16} opacity={0.5} />
+            </Table.Td>
+          </Table.Tr>
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+}
+
 function ListSection() {
   const [asOf, setAsOf] = useState('');
   const list = useAction<LoanSummaryOut[]>();
@@ -45,9 +104,9 @@ function ListSection() {
 
   return (
     <Stack gap="lg">
-      <PageHeader title="Кредиты" subtitle="Сохранённые кредиты: остаток и дата закрытия на выбранную дату. Нажми на строку — откроется карточка." />
+      <PageHeader title="Кредиты" subtitle="Активные кредиты: остаток и дата закрытия на выбранную дату. Нажми на строку — откроется карточка." />
       <Panel
-        title={list.data ? `Всего: ${list.data.length}` : 'Список'}
+        title={list.data ? `Активных: ${list.data.length}` : 'Список'}
         actions={
           <Group align="flex-end" gap="sm">
             <AsOfField value={asOf} onChange={setAsOf} />
@@ -60,35 +119,53 @@ function ListSection() {
         <ErrorAlert error={list.error} />
         {list.data && list.data.length === 0 && (
           <Text size="sm" c="dimmed">
-            Кредитов пока нет — добавь в разделе «Новый кредит».
+            Активных кредитов нет — добавь в разделе «Новый кредит» или загляни в «Архив».
           </Text>
         )}
-        {list.data && list.data.length > 0 && (
-          <Table highlightOnHover verticalSpacing="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Название</Table.Th>
-                <Table.Th ta="right">Сумма</Table.Th>
-                <Table.Th ta="right">Остаток</Table.Th>
-                <Table.Th>Закрытие</Table.Th>
-                <Table.Th w={40} />
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {list.data.map((loan) => (
-                <Table.Tr key={loan.id} style={{ cursor: 'pointer' }} onClick={() => (window.location.hash = `#loans/list/${loan.id}`)}>
-                  <Table.Td fw={600}>{loan.name}</Table.Td>
-                  <Table.Td ta="right">{money(loan.principal)}</Table.Td>
-                  <Table.Td ta="right">{money(loan.balance)}</Table.Td>
-                  <Table.Td>{date(loan.close_date)}</Table.Td>
-                  <Table.Td>
-                    <IconChevronRight size={16} opacity={0.5} />
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+        {list.data && list.data.length > 0 && <LoansTable loans={list.data} section="list" />}
+      </Panel>
+    </Stack>
+  );
+}
+
+// ---------- архив: завершённые и удалённые ----------
+
+function ArchiveSection() {
+  const [status, setStatus] = useState<LoanStatus>('completed');
+  const list = useAction<LoanSummaryOut[]>();
+  const { run } = list;
+
+  useEffect(() => {
+    void run(() => loansApi.list(undefined, status));
+  }, [run, status]);
+
+  return (
+    <Stack gap="lg">
+      <PageHeader
+        title="Архив"
+        subtitle="Завершённые — выплаченные, учитываются во всех расчётах. Удалённые — не учитываются нигде, их можно восстановить."
+      />
+      <Panel
+        title={list.data ? `${status === 'completed' ? 'Завершённых' : 'Удалённых'}: ${list.data.length}` : 'Архив'}
+        actions={
+          <SegmentedControl
+            radius="xl"
+            value={status}
+            onChange={(value) => setStatus(value as LoanStatus)}
+            data={[
+              { value: 'completed', label: 'Завершённые' },
+              { value: 'deleted', label: 'Удалённые' },
+            ]}
+          />
+        }
+      >
+        <ErrorAlert error={list.error} />
+        {list.data && list.data.length === 0 && (
+          <Text size="sm" c="dimmed">
+            Здесь пусто.
+          </Text>
         )}
+        {list.data && list.data.length > 0 && <LoansTable loans={list.data} section="archive" />}
       </Panel>
     </Stack>
   );
@@ -96,13 +173,50 @@ function ListSection() {
 
 // ---------- карточка кредита + ЧДП ----------
 
-function DetailSection({ id }: { id: string }) {
+function DetailSection({ id, back }: { id: string; back: LoansSection }) {
   const [asOf, setAsOf] = useState('');
   const [prepayment, setPrepayment] = useState<Prepayment>(clone(EXAMPLE_PREPAYMENT));
   const detail = useAction<LoanDetailOut>();
   const preview = useAction<PreviewOut>();
   const add = useAction<LoanDetailOut>();
+  const change = useAction<LoanDetailOut>();
   const { run } = detail;
+
+  const changeStatus = async (action: 'remove' | 'complete' | 'restore') => {
+    const name = detail.data?.name ?? 'кредит';
+    const texts = {
+      remove: {
+        title: `Удалить «${name}»?`,
+        message: 'Кредит уйдёт в «Архив → Удалённые» и перестанет учитываться в расчётах. Его можно восстановить.',
+        label: 'Удалить',
+        done: 'Кредит в «Удалённых»',
+      },
+      complete: {
+        title: `Перевести «${name}» в завершённые?`,
+        message: 'Кредит выплачен. Он уйдёт из «Мои кредиты» в «Архив → Завершённые» и продолжит учитываться в статистике.',
+        label: 'В завершённые',
+        done: 'Кредит в «Завершённых»',
+      },
+      restore: {
+        title: `Восстановить «${name}»?`,
+        message: 'Кредит вернётся туда, откуда его удалили, со всеми ЧДП.',
+        label: 'Восстановить',
+        done: 'Кредит восстановлен',
+      },
+    }[action];
+    const ok = await confirmAction({
+      title: texts.title,
+      message: <Text size="sm">{texts.message}</Text>,
+      confirmLabel: texts.label,
+      danger: action === 'remove',
+    });
+    if (!ok) return;
+    const updated = await change.run(() => loansApi[action](id));
+    if (updated) {
+      detail.setData(updated);
+      notifyDone(texts.done, '');
+    }
+  };
 
   useEffect(() => {
     void run(() => loansApi.detail(id));
@@ -136,9 +250,14 @@ function DetailSection({ id }: { id: string }) {
   return (
     <Stack gap="lg">
       <Group>
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => (window.location.hash = '#loans/list')}>
-          Все кредиты
+        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => (window.location.hash = `#loans/${back}`)}>
+          {back === 'archive' ? 'Архив' : 'Все кредиты'}
         </Button>
+        {detail.data && (
+          <Badge variant="light" radius="sm" color={STATUS_BADGE[detail.data.status].color}>
+            {STATUS_BADGE[detail.data.status].text}
+          </Badge>
+        )}
       </Group>
       <PageHeader title={detail.data?.name ?? 'Кредит'} subtitle="Стартовые и актуальные данные, итоги ЧДП, график с отметкой «прошёл», история платежей." />
       <Panel>
@@ -151,9 +270,31 @@ function DetailSection({ id }: { id: string }) {
         <ErrorAlert error={detail.error} />
       </Panel>
 
+      {detail.data?.can_complete && (
+        <Alert color="teal" radius="lg" variant="light" icon={<IconCircleCheck size={18} />} title="Кредит выплачен">
+          <Group justify="space-between">
+            <Text size="sm">Остаток долга — 0. Можно убрать его в архив завершённых: в статистике он останется.</Text>
+            <Button size="xs" color="teal" leftSection={<IconArchive size={14} />} loading={change.loading} onClick={() => changeStatus('complete')}>
+              В архив завершённых
+            </Button>
+          </Group>
+        </Alert>
+      )}
+      {detail.data?.status === 'deleted' && (
+        <Alert color="red" radius="lg" variant="light" icon={<IconTrash size={18} />} title="Кредит удалён">
+          <Group justify="space-between">
+            <Text size="sm">Он не учитывается ни в каких расчётах, и ЧДП в него не вносятся.</Text>
+            <Button size="xs" variant="light" color="red" leftSection={<IconRestore size={14} />} loading={change.loading} onClick={() => changeStatus('restore')}>
+              Восстановить
+            </Button>
+          </Group>
+        </Alert>
+      )}
+      <ErrorAlert error={change.error} />
+
       {detail.data && <CalculationView calculation={detail.data} />}
 
-      {detail.data && (
+      {detail.data?.status === 'active' && (
         <Panel title="Досрочный платёж (ЧДП)" subtitle="Сначала прогноз — он ничего не сохраняет. Внести — навсегда.">
           <Stack gap="md">
             <PrepaymentFields value={prepayment} onChange={setPrepayment} />
@@ -171,6 +312,13 @@ function DetailSection({ id }: { id: string }) {
             {preview.data && <PreviewView preview={preview.data} />}
           </Stack>
         </Panel>
+      )}
+      {detail.data && detail.data.status !== 'deleted' && (
+        <Group justify="flex-end">
+          <Button variant="subtle" color="red" leftSection={<IconTrash size={16} />} loading={change.loading} onClick={() => changeStatus('remove')}>
+            Удалить кредит
+          </Button>
+        </Group>
       )}
     </Stack>
   );

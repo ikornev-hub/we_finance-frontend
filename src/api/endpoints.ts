@@ -9,8 +9,8 @@ import type {
   LoanCreateIn,
   LoanDetailOut,
   LoanIn,
+  LoanStatus,
   LoanSummaryOut,
-  MoneyRoundResponse,
   Prepayment,
   PreviewOut,
   SalaryCalculationIn,
@@ -26,13 +26,14 @@ const V1 = '/api/v1';
 
 export const authApi = {
   login: (login: string, password: string) => api.post<{ token: string }>(`${V1}/auth/login`, { login, password }),
+  /** Только на стендах dev и test; на stage и prod — 404. */
+  testLogin: () => api.post<{ token: string }>(`${V1}/auth/test-login`),
 };
 
 export const serviceApi = {
   // 503 — API живо, но база недоступна: это тоже ответ, а не ошибка связи.
   health: () => request<HealthResponse>('GET', '/health', { accept: [503] }),
   version: () => api.get<VersionResponse>('/version'),
-  round: (amount: string) => api.get<MoneyRoundResponse>(`${V1}/money/round`, { amount }),
 };
 
 export const salaryApi = {
@@ -46,7 +47,8 @@ export const salaryApi = {
 };
 
 export const loansApi = {
-  list: (asOf?: string) => api.get<LoanSummaryOut[]>(`${V1}/loans`, { as_of: asOf }),
+  list: (asOf?: string, status: LoanStatus = 'active') =>
+    api.get<LoanSummaryOut[]>(`${V1}/loans`, { as_of: asOf, status }),
   create: (loan: LoanCreateIn) => api.post<LoanDetailOut>(`${V1}/loans`, loan),
   detail: (id: string, asOf?: string) =>
     api.get<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}`, { as_of: asOf }),
@@ -54,6 +56,9 @@ export const loansApi = {
     api.post<PreviewOut>(`${V1}/loans/${encodeURIComponent(id)}/prepayments/preview`, prepayment),
   addPrepayment: (id: string, prepayment: Prepayment) =>
     api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/prepayments`, prepayment),
+  remove: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/delete`),
+  complete: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/complete`),
+  restore: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/restore`),
 };
 
 export const calculatorApi = {

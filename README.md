@@ -11,9 +11,9 @@ React + TypeScript + Vite + [Mantine](https://mantine.dev). Вид — по ре
 |---|---|---|
 | **Главная** | этот месяц: доход, платежи по кредитам, что останется; лента ближайших событий; кредиты коротко | `GET /salary/{year}`, `GET /loans`, `GET /loans/{id}` |
 | **Доходы** | Отчёт (главная раздела), «Отпуск или больничный», «Что если»; «Мои данные» — по кнопке «Актуализировать данные» | `GET /salary/{year}`, `GET`/`PUT /salary/profile`, `POST /salary/absences`, `POST /salary/{year}/what-if` |
-| **Кредиты** | Мои кредиты (→ карточка, ЧДП) · Новый кредит | `GET`/`POST /loans`, `GET /loans/{id}`, `POST /loans/{id}/prepayments/preview`, `POST /loans/{id}/prepayments` |
+| **Кредиты** | Мои кредиты (→ карточка, ЧДП, удалить / в завершённые) · Архив (завершённые, удалённые → восстановить) · Новый кредит | `GET`/`POST /loans`, `GET /loans/{id}`, `POST /loans/{id}/prepayments/preview`, `POST /loans/{id}/prepayments`, `POST /loans/{id}/delete\|complete\|restore`, `GET /loans?status=` |
 | **Калькулятор** | график и полный расчёт с ЧДП | `POST /calculator/schedule`, `POST /calculator/calculate` |
-| ⚙ **Система** (шестерёнка в шапке) | состояние, версия, округление | `GET /health`, `GET /version`, `GET /money/round` |
+| ⚙ **Система** (шестерёнка в шапке) | состояние и версия | `GET /health`, `GET /version` |
 
 Формы заполнены **учебными примерами** из требований: можно сразу жать кнопки.
 
@@ -77,5 +77,7 @@ src/
   pages/        HomePage, IncomePage, LoansPage, CalculatorPage, ServicePage
   navigation.tsx  вкладки и разделы; адрес #вкладка/раздел — работают «назад» и ссылки
 ```
+
+Платежи и выплаты имеют статус: «Проведён» (раньше сегодня, учтён), «Сегодня» (ещё не учтён) и «Запланирован».
 
 Деньги приходят строками (`"1458106.20"`) и форматируются как строки — без float и потери копеек.
