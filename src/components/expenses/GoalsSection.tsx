@@ -11,7 +11,7 @@ import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert, errorText } from '../ErrorAlert';
 import { DateField, MoneyField } from '../fields';
-import { MonthSwitch, monthTitle, shiftMonth, useSelectedMonth } from './common';
+import { MonthSwitch, currentMonth, monthTitle, shiftMonth, useSelectedMonth } from './common';
 
 /** «2027-08» → «август 2027». */
 function etaTitle(eta: string | null): string {
@@ -190,15 +190,32 @@ export function GoalsSection() {
   );
 }
 
-/** Подушка = 6 месяцев обязательных и управляемых трат по медиане полных месяцев. */
-async function cushion(): Promise<number | null> {
-  const now = new Date();
-  const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+/** Подушка = 6 × сумма медиан обязательных и управляемых категорий (без «Покупок»).
+
+Медиана по каждой категории, а не по группе: месяцы с ЧДП или разовой покупкой не раздувают сумму.
+Берутся только месяцы, целиком покрытые выпиской.
+*/
+async function cushion(): Promise<{ total: number; monthly: number; parts: { name: string; median: number }[]; months: number } | null> {
+  const current = currentMonth();
   const analysis = await expensesApi.analysis(shiftMonth(current, -6), shiftMonth(current, -1));
-  const median = (code: string) => Number(analysis.stats.find((stat) => stat.kind === 'group' && stat.id === code)?.median ?? 0);
-  const monthly = median('mandatory') + median('managed');
-  return monthly > 0 ? Math.ceil((monthly * 6) / 10000) * 10000 : null;
+  const parts = analysis.stats
+    .filter((stat) => stat.kind === 'category' && (stat.group_code === 'mandatory' || stat.group_code === 'managed') && stat.name !== 'Покупки')
+    .map((stat) => ({ name: stat.name, median: Number(stat.median) }))
+    .filter((part) => part.median > 0)
+    .sort((a, b) => b.median - a.median);
+  const monthly = parts.reduce((sum, part) => sum + part.median, 0);
+  if (monthly <= 0) return null;
+  return { total: Math.ceil((monthly * 6) / 10000) * 10000, monthly, parts, months: analysis.months.length };
 }
+
+/** Последний день месяца через N месяцев: «2027-10-31». */
+function monthsAhead(count: number): string {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + count + 1, 0);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+}
+
+const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
 function GoalForm({ initial, title, onClose, onSave }: { initial: SavingsGoalIn; title: string; onClose: () => void; onSave: (goal: SavingsGoalIn) => void }) {
   const [goal, setGoal] = useState<SavingsGoalIn>(initial);
@@ -218,15 +235,27 @@ function GoalForm({ initial, title, onClose, onSave }: { initial: SavingsGoalIn;
             leftSection={<IconCalculator size={14} />}
             onClick={async () => {
               const value = await cushion().catch(() => null);
-              if (value) {
-                setGoal({ ...goal, target_amount: value.toFixed(2), name: goal.name || 'Подушка' });
-                setHint('6 месяцев обязательных и управляемых трат по медиане последних полных месяцев');
-              } else setHint('Мало данных: загрузи выписку хотя бы за пару месяцев');
+              if (!value) {
+                setHint('Мало данных: нужна выписка хотя бы за пару полных месяцев');
+                return;
+              }
+              // Срок по умолчанию — год: цель сразу можно сохранить, план в месяц посчитает система.
+              setMode('deadline');
+              setGoal({ ...goal, target_amount: value.total.toFixed(2), name: goal.name || 'Подушка', deadline: monthsAhead(12), monthly_amount: null });
+              setHint(
+                `В месяц на жизнь ≈ ${rub(value.monthly)} — медианы: ${value.parts.map((part) => `${part.name} ${rub(part.median)}`).join(', ')}. ` +
+                  `× 6 месяцев ≈ ${rub(value.total)} (округлено). Срок — через год, это ≈ ${rub(value.total / 12)} в месяц; поменяй срок или переключись на взнос.`,
+              );
             }}
           >
             Посчитать по моим тратам
           </Button>
         </Group>
+        {Number(goal.target_amount) > 0 && (
+          <Text size="sm" fw={600}>
+            = {rub(Number(goal.target_amount))}
+          </Text>
+        )}
         {hint && (
           <Text size="xs" c="dimmed">
             {hint}
