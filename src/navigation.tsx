@@ -39,6 +39,8 @@ export const TABS: Tab[] = [
   {
     id: 'home',
     label: 'Главная',
+    // Скрыта до решения, что на ней (заказчик, 2026-10-26).
+    hidden: true,
     sections: [{ id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> }],
   },
   {
@@ -84,7 +86,7 @@ export interface Route {
 
 function parse(hash: string): Route {
   const [tabId, sectionId, ...rest] = hash.replace(/^#\/?/, '').split('/');
-  const tab = TABS.find((candidate) => candidate.id === tabId) ?? TABS[0];
+  const tab = TABS.find((candidate) => candidate.id === tabId) ?? TABS.find((candidate) => !candidate.hidden) ?? TABS[0];
   const section = tab.sections.find((candidate) => candidate.id === sectionId) ?? tab.sections[0];
   const param = rest.length ? decodeURIComponent(rest.join('/')) : undefined;
   return { tab, section, param };
