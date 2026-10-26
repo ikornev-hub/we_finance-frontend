@@ -71,6 +71,7 @@ export const SAMPLE_MONTH: MonthReport = {
   disposable: '100000.00',
   uncategorized_count: 4,
   has_statement: true,
+  closed: true,
   warnings: [],
   forecast: {
     income: '180000.00',

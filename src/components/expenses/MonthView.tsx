@@ -13,7 +13,7 @@ export function MonthTotals({ report }: { report: MonthReport }) {
   return (
     <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="md">
       <HeroCard
-        label="Можно ещё потратить"
+        label={report.closed ? 'Осталось по итогам месяца' : 'Можно ещё потратить'}
         value={money(report.forecast.can_spend)}
         caption={`Располагаемый ${money(report.forecast.disposable)} − потрачено ${money(report.forecast.spent)}`}
         icon={<IconWallet size={18} />}
@@ -42,7 +42,10 @@ export function ForecastPanel({ report }: { report: MonthReport }) {
     ['Границами распределено', money(f.limits_total), `не распределено ${money(f.unallocated)}`],
   ];
   return (
-    <Panel title="Прогноз месяца" subtitle="План + факт: в середине месяца доли не прыгают, пока не пришла зарплата">
+    <Panel
+      title={report.closed ? 'Итог месяца' : 'Прогноз месяца'}
+      subtitle={report.closed ? 'Месяц закончился — всё по факту выписки' : 'План + факт: в середине месяца доли не прыгают, пока не пришла зарплата'}
+    >
       {report.warnings.map((warning) => (
         <Text key={warning} size="sm" c="orange" mb={4}>
           {warning}

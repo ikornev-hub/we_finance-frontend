@@ -345,6 +345,8 @@ export interface MonthReport {
   disposable: Money;
   uncategorized_count: number;
   has_statement: boolean;
+  /** Месяц закончился: прогноз = факт. */
+  closed: boolean;
   warnings: string[];
   forecast: MonthForecast;
   categories: MonthCategory[];
