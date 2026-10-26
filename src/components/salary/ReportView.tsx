@@ -23,7 +23,7 @@ export function WhatIfView({ result }: { result: WhatIfOut }) {
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
         <StatCard label={`На руки за ${result.year} — сейчас`} value={money(result.net_before)} />
         <StatCard label="На руки — если так" value={money(result.net_after)} />
-        <HeroCard label="Изменение за год" value={signedMoney(result.net_change)} caption="После минус до" />
+        <HeroCard label="Изменение за год" value={signedMoney(result.net_change)} caption="Насколько больше (+) или меньше (−) на руки за год, чем сейчас" />
       </SimpleGrid>
 
       <Panel title="По месяцам: было и станет">

@@ -94,13 +94,14 @@ function YearSwitch({ year, onChange }: { year: number; onChange: (year: number)
 function OverviewSection() {
   const [year, setYear] = useState(THIS_YEAR);
   const report = useAction<YearReportOut>();
-  const { run } = report;
+  const { run, reset } = report;
   const [absenceOpen, absenceModal] = useDisclosure(false);
   const checks = useOrSample(() => expensesApi.incomeCheck(year), SAMPLE_INCOME_CHECK, String(year));
 
   useEffect(() => {
+    reset(); // другой год: старый отчёт не показываем, даже если новый не загрузится (#9)
     void run(() => salaryApi.year(year));
-  }, [run, year]);
+  }, [run, reset, year]);
 
   const afterAbsence = async (before: string | null) => {
     absenceModal.close();
@@ -266,10 +267,28 @@ function DataSection() {
 
 // ---------- что если ----------
 
+/** 1-е число следующего месяца: «2026-11-01». */
+function nextMonthStart(): string {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
 function WhatIfSection() {
   const [year, setYear] = useState(THIS_YEAR);
   const [terms, setTerms] = useState<SalaryTerms>(clone(EXAMPLE_WHAT_IF));
   const result = useAction<WhatIfOut>();
+
+  // Старт — текущие условия из профиля с 1-го числа следующего месяца; пример — только без профиля (#16).
+  useEffect(() => {
+    salaryApi
+      .getProfile()
+      .then((profile) => {
+        const current = [...profile.terms].sort((a, b) => a.start.localeCompare(b.start)).at(-1);
+        if (current) setTerms({ start: nextMonthStart(), salary: current.salary, meal_per_day: current.meal_per_day });
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <Stack gap="lg">
