@@ -1,10 +1,10 @@
-import { Alert, Badge, Button, Group, Modal, Progress, SegmentedControl, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Badge, Button, Group, Modal, Progress, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconAlertTriangle, IconCalculator, IconPigMoney, IconPlus } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import { expensesApi } from '../../api/endpoints';
-import type { SavingsGoal, SavingsGoalIn } from '../../api/types';
+import { expensesApi, loansApi } from '../../api/endpoints';
+import type { LoanGoalPreview, LoanSummaryOut, SavingsGoal, SavingsGoalIn } from '../../api/types';
 import { confirmAction } from '../../lib/confirm';
 import { money, todayIso } from '../../lib/format';
 import { useOrSample } from '../../lib/sample';
@@ -136,34 +136,44 @@ export function GoalsSection() {
         {list.map((goal) => {
           const progress = Math.min((Number(goal.saved) / Number(goal.target_amount)) * 100, 100);
           // Не достигается при таком взносе — тревога и для цели без срока.
-          const late = !goal.eta || Boolean(goal.deadline && goal.eta > goal.deadline.slice(0, 7));
+          const loan = Boolean(goal.loan_id);
+          const late = loan
+            ? Boolean(goal.deadline && (!goal.closes_on || goal.closes_on > goal.deadline))
+            : !goal.eta || Boolean(goal.deadline && goal.eta > goal.deadline.slice(0, 7));
+          const subtitle = loan
+            ? goal.deadline
+              ? `закрыть кредит к ${ddmmyyyy(goal.deadline)}`
+              : `ЧДП ${money(goal.monthly_amount)} в месяц`
+            : goal.deadline
+              ? toMonth(goal.deadline.slice(0, 7))
+              : `по ${money(goal.monthly_amount)} в месяц`;
           return (
-            <Panel key={goal.id} title={goal.name} subtitle={goal.deadline ? toMonth(goal.deadline.slice(0, 7)) : `по ${money(goal.monthly_amount)} в месяц`}>
+            <Panel key={goal.id} title={goal.name} subtitle={subtitle}>
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" fw={600}>
                     {money(goal.saved)}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    из {money(goal.target_amount)}
+                    {loan ? 'погашено из' : 'из'} {money(goal.target_amount)}
                   </Text>
                 </Group>
                 <Progress value={progress} size="lg" color={progress >= 100 ? 'teal' : 'brand'} />
                 <Group justify="space-between">
                   <Text size="xs" c="dimmed">
-                    план в месяц
+                    {loan ? 'план ЧДП в месяц' : 'план в месяц'}
                   </Text>
                   <Text size="sm">{money(goal.plan)}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="xs" c="dimmed">
-                    реально откладывается
+                    {loan ? 'реально влезает в бюджет' : 'реально откладывается'}
                   </Text>
                   <Text size="sm" c={Number(goal.contribution) < Number(goal.plan) ? 'orange' : undefined}>
                     {money(goal.contribution)}
                   </Text>
                 </Group>
-                {Number(goal.contribution) < Number(goal.plan) && (
+                {!loan && Number(goal.contribution) < Number(goal.plan) && (
                   <Text size="xs" c="orange">
                     {Number(goal.contribution) === 0
                       ? `${inMonth(month).replace(/^в/, 'В')} отложить не из чего: доход съели обязательные и границы трат.`
@@ -174,21 +184,40 @@ export function GoalsSection() {
                 <Badge variant="light" color={progress >= 100 ? 'teal' : late ? 'red' : 'teal'} radius="sm">
                   {progress >= 100
                     ? 'достигнута'
-                    : !goal.eta
-                      ? 'не достигается: план в месяц — 0'
-                      : goal.deadline
-                        ? `${late ? 'не успеваешь' : 'успеваешь'}: ${etaTitle(goal.eta)}`
-                        : `достигнешь: ${etaTitle(goal.eta)}`}
+                    : loan
+                      ? goal.closes_on
+                        ? `${goal.deadline ? (late ? 'не успеваешь: ' : 'успеваешь: ') : ''}закроешь ${ddmmyyyy(goal.closes_on)}`
+                        : 'дата закрытия неизвестна'
+                      : !goal.eta
+                        ? 'не достигается: план в месяц — 0'
+                        : goal.deadline
+                          ? `${late ? 'не успеваешь' : 'успеваешь'}: ${etaTitle(goal.eta)}`
+                          : `достигнешь: ${etaTitle(goal.eta)}`}
                 </Badge>
                 {goal.start_date && goal.start_date.slice(0, 7) > month && (
                   <Text size="xs" c="dimmed">
                     Копить с {goal.start_date.split('-').reverse().join('.')} — до этого цель денег не берёт
                   </Text>
                 )}
+                {loan && Number(goal.interest_saved) > 0 && (
+                  <Group justify="space-between">
+                    <Text size="xs" c="dimmed">
+                      сэкономишь на процентах
+                    </Text>
+                    <Text size="sm" fw={600} c="teal">
+                      {money(goal.interest_saved)}
+                    </Text>
+                  </Group>
+                )}
+                {goal.note && (
+                  <Text size="xs" c="orange">
+                    {goal.note}
+                  </Text>
+                )}
                 {goal.paydays.length > 0 && (
                   <Stack gap={2}>
                     <Text size="xs" c="dimmed">
-                      Положить в день выплаты:
+                      {loan ? 'ЧДП в день выплаты:' : 'Положить в день выплаты:'}
                     </Text>
                     {goal.paydays.map((day) => (
                       <Group key={day.date} justify="space-between">
@@ -203,14 +232,18 @@ export function GoalsSection() {
                   </Stack>
                 )}
                 <Text size="xs" c="dimmed">
-                  {goal.account_tails.length
-                    ? `Накопительный счёт ${goal.account_tails.map((tail) => `…${tail}`).join(', ')} — переводы на него засчитываются сами`
-                    : 'Счёта нет — откладывай кнопкой «Отложил» или привяжи счёт в «Своих счетах»'}
+                  {loan
+                    ? 'Внёс ЧДП — запиши его в «Кредитах»: прогресс и следующие ЧДП считаются по остатку долга'
+                    : goal.account_tails.length
+                      ? `Накопительный счёт ${goal.account_tails.map((tail) => `…${tail}`).join(', ')} — переводы на него засчитываются сами`
+                      : 'Счёта нет — откладывай кнопкой «Отложил» или привяжи счёт в «Своих счетах»'}
                 </Text>
                 <Group gap="xs" mt="xs">
-                  <Button size="xs" variant="light" onClick={() => setSaving(goal)}>
-                    Отложил
-                  </Button>
+                  {!loan && (
+                    <Button size="xs" variant="light" onClick={() => setSaving(goal)}>
+                      Отложил
+                    </Button>
+                  )}
                   <Button
                     size="xs"
                     variant="default"
@@ -224,6 +257,7 @@ export function GoalsSection() {
                           monthly_amount: goal.monthly_amount,
                           initial_amount: goal.initial_amount,
                           start_date: goal.start_date,
+                          loan_id: goal.loan_id,
                         },
                       })
                     }
@@ -302,6 +336,9 @@ async function cushion(): Promise<{
   };
 }
 
+/** «2027-06-25» → «25.06.2027». */
+const ddmmyyyy = (iso: string) => iso.split('-').reverse().join('.');
+
 const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
 /** Месяцев от текущего до месяца срока включительно — как считает план на backend. */
@@ -330,7 +367,22 @@ function GoalForm({
   const [free, setFree] = useState<number | null>(null);
   // У заведённой цели: взносы, уже сделанные в приложении (сверх «уже отложено»).
   const [contributed, setContributed] = useState(0);
-  const valid = goal.name.trim() && Number(goal.target_amount) > 0 && (mode === 'deadline' ? Boolean(goal.deadline) : Number(goal.monthly_amount) > 0);
+  // «Накопить» или «Закрыть кредит»; у заведённой цели вид не меняется.
+  const [kind, setKind] = useState<'save' | 'loan'>(initial.loan_id ? 'loan' : 'save');
+  const [loans, setLoans] = useState<LoanSummaryOut[]>([]);
+  const [preview, setPreview] = useState<LoanGoalPreview | null>(null);
+  const isLoan = kind === 'loan';
+  const valid =
+    goal.name.trim() &&
+    Number(goal.target_amount) > 0 &&
+    (!isLoan || Boolean(goal.loan_id)) &&
+    (mode === 'deadline' ? Boolean(goal.deadline) : Number(goal.monthly_amount) > 0);
+  useEffect(() => {
+    loansApi
+      .list()
+      .then(setLoans)
+      .catch(() => setLoans([]));
+  }, []);
 
   // Свободно в следующем месяце: после обязательных, трат по границам и уже заведённых целей.
   // Месяц, с которого цель берёт деньги: текущий или месяц старта, если он позже.
@@ -349,10 +401,38 @@ function GoalForm({
       .catch(() => setFree(null));
   }, [next, goalId]);
 
+  // Кредит: расчёт ЧДП на backend по настоящему графику; пересчёт после паузы во вводе.
+  const payload: SavingsGoalIn = {
+    name: goal.name.trim() || 'Закрыть кредит',
+    target_amount: Number(goal.target_amount || 0).toFixed(2),
+    deadline: mode === 'deadline' ? goal.deadline : null,
+    monthly_amount: mode === 'monthly' && Number(goal.monthly_amount) > 0 ? Number(goal.monthly_amount).toFixed(2) : null,
+    initial_amount: isLoan ? '0.00' : Number(goal.initial_amount || 0).toFixed(2),
+    start_date: goal.start_date || null,
+    loan_id: isLoan ? goal.loan_id || null : null,
+  };
+  const previewKey = isLoan && valid ? JSON.stringify(payload) : '';
+  useEffect(() => {
+    if (!previewKey) {
+      setPreview(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      expensesApi
+        .previewGoal(JSON.parse(previewKey) as SavingsGoalIn, next)
+        .then(setPreview)
+        .catch(() => setPreview(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [previewKey, next]);
+  const loanClose = loans.find((item) => item.id === goal.loan_id)?.close_date;
+
   // Расчёт по тому, что ввёл пользователь: к сроку → взнос в месяц, взносом → месяц достижения.
   const left = Number(goal.target_amount || 0) - Number(goal.initial_amount || 0) - contributed;
   let calc: { monthly: number; months: number } | null = null;
-  if (left > 0 && mode === 'deadline' && goal.deadline) {
+  if (isLoan) {
+    calc = null;
+  } else if (left > 0 && mode === 'deadline' && goal.deadline) {
     const months = monthsUntil(goal.deadline, first);
     calc = { monthly: Math.ceil(left / months), months };
   } else if (left > 0 && mode === 'monthly' && Number(goal.monthly_amount) > 0) {
@@ -364,23 +444,59 @@ function GoalForm({
   return (
     <Modal opened onClose={onClose} title={title} radius="lg" centered>
       <Stack gap="sm">
+        {!goalId && (
+          <SegmentedControl
+            value={kind}
+            onChange={(value) => {
+              setKind(value as 'save' | 'loan');
+              setGoal({ ...goal, loan_id: null });
+            }}
+            data={[
+              { value: 'save', label: 'Накопить' },
+              { value: 'loan', label: 'Закрыть кредит' },
+            ]}
+          />
+        )}
+        {isLoan && (
+          <Select
+            label="Кредит"
+            placeholder={loans.length ? 'Выбери кредит' : 'Активных кредитов нет'}
+            data={loans.map((item) => ({ value: item.id, label: `${item.name} — остаток ${money(item.balance)}` }))}
+            value={goal.loan_id ?? null}
+            onChange={(id) => {
+              const picked = loans.find((item) => item.id === id);
+              setGoal({
+                ...goal,
+                loan_id: id,
+                target_amount: picked ? picked.balance : goal.target_amount,
+                name: goal.name || (picked ? `Закрыть «${picked.name}»` : ''),
+              });
+            }}
+            disabled={Boolean(goalId)}
+            radius="md"
+          />
+        )}
         <TextInput
           label="Название"
-          placeholder="Подушка, квартира, свадьба…"
+          placeholder={isLoan ? 'Закрыть автокредит' : 'Подушка, квартира, свадьба…'}
           value={goal.name}
           onChange={(event) => setGoal({ ...goal, name: event.currentTarget.value })}
           radius="md"
         />
-        <MoneyField label="Сколько нужно" value={goal.target_amount} onChange={(target_amount) => setGoal({ ...goal, target_amount })} width={200} />
-        <MoneyField
-          label="Уже отложено"
-          description="До начала учёта в приложении"
-          value={goal.initial_amount ?? '0'}
-          onChange={(initial_amount) => setGoal({ ...goal, initial_amount: initial_amount || '0' })}
-          width={200}
-        />
+        {!isLoan && (
+          <>
+            <MoneyField label="Сколько нужно" value={goal.target_amount} onChange={(target_amount) => setGoal({ ...goal, target_amount })} width={200} />
+            <MoneyField
+              label="Уже отложено"
+              description="До начала учёта в приложении"
+              value={goal.initial_amount ?? '0'}
+              onChange={(initial_amount) => setGoal({ ...goal, initial_amount: initial_amount || '0' })}
+              width={200}
+            />
+          </>
+        )}
         <DateField
-          label="Начать копить с"
+          label={isLoan ? 'Начать ЧДП с' : 'Начать копить с'}
           description="Пусто — с этого месяца"
           value={goal.start_date ?? ''}
           onChange={(start_date) => setGoal({ ...goal, start_date: start_date || null })}
@@ -390,15 +506,20 @@ function GoalForm({
           value={mode}
           onChange={(value) => setMode(value as 'deadline' | 'monthly')}
           data={[
-            { value: 'deadline', label: 'К сроку' },
-            { value: 'monthly', label: 'Взнос в месяц' },
+            { value: 'deadline', label: isLoan ? 'Закрыть к дате' : 'К сроку' },
+            { value: 'monthly', label: isLoan ? 'ЧДП в месяц' : 'Взнос в месяц' },
           ]}
         />
         {mode === 'deadline' ? (
-          <DateField label="Срок" value={goal.deadline ?? ''} onChange={(deadline) => setGoal({ ...goal, deadline: deadline || null })} width={200} />
+          <DateField
+            label={isLoan ? 'Закрыть к' : 'Срок'}
+            value={goal.deadline ?? ''}
+            onChange={(deadline) => setGoal({ ...goal, deadline: deadline || null })}
+            width={200}
+          />
         ) : (
           <MoneyField
-            label="Откладывать в месяц"
+            label={isLoan ? 'ЧДП в месяц' : 'Откладывать в месяц'}
             value={goal.monthly_amount ?? ''}
             onChange={(monthly_amount) => setGoal({ ...goal, monthly_amount: monthly_amount || null })}
             width={200}
@@ -425,21 +546,62 @@ function GoalForm({
             </Stack>
           </Alert>
         )}
-        {left <= 0 && Number(goal.target_amount) > 0 && (
+        {isLoan && preview && (
+          <Alert
+            color={preview.note || (free !== null && Number(preview.plan) > free) ? 'orange' : 'teal'}
+            radius="md"
+            variant="light"
+            title="Расчёт по графику кредита"
+          >
+            <Stack gap={4}>
+              {preview.paydays.length > 0 && (
+                <Text size="sm">
+                  ЧДП {inMonth(next)}:{' '}
+                  {preview.paydays.map((day) => `${dayMonth(day.date)} (${day.kind === 'advance' ? 'аванс' : 'зарплата'}) — ${money(day.amount)}`).join(', ')}
+                </Text>
+              )}
+              {preview.closes_on && (
+                <Text size="sm">
+                  Закроешь {ddmmyyyy(preview.closes_on)}
+                  {loanClose && loanClose !== preview.closes_on ? ` вместо ${ddmmyyyy(loanClose)} по графику банка` : ''}
+                  {Number(preview.interest_saved) > 0 ? `, сэкономишь на процентах ${money(preview.interest_saved)}` : ''}.
+                </Text>
+              )}
+              {preview.note && (
+                <Text size="sm" c="orange">
+                  {preview.note}
+                </Text>
+              )}
+              {free !== null && Number(preview.plan) > 0 && (
+                <Text size="sm" c={Number(preview.plan) > free ? 'orange' : 'dimmed'}>
+                  {Number(preview.plan) > free
+                    ? `Свободно ${inMonth(next)} ≈ ${rub(free)} — не хватает ${rub(Number(preview.plan) - free)}; цели поделят свободное пропорционально.`
+                    : `Свободно ${inMonth(next)} ≈ ${rub(free)} — влезает, останется ${rub(free - Number(preview.plan))}.`}
+                </Text>
+              )}
+              <Text size="xs" c="dimmed">
+                Вносишь меньше плана — «Закрыть к дате» поднимет следующие ЧДП, «ЧДП в месяц» сдвинет дату.
+              </Text>
+            </Stack>
+          </Alert>
+        )}
+        {!isLoan && left <= 0 && Number(goal.target_amount) > 0 && (
           <Text size="sm" c="teal">
             Уже отложено не меньше нужного — цель достигнута.
           </Text>
         )}
 
-        <Button
-          variant="subtle"
-          size="xs"
-          leftSection={<IconCalculator size={14} />}
-          w="fit-content"
-          onClick={async () => setSuggestion((await cushion().catch(() => null)) ?? 'empty')}
-        >
-          Сколько нужно на подушку по моим тратам?
-        </Button>
+        {!isLoan && (
+          <Button
+            variant="subtle"
+            size="xs"
+            leftSection={<IconCalculator size={14} />}
+            w="fit-content"
+            onClick={async () => setSuggestion((await cushion().catch(() => null)) ?? 'empty')}
+          >
+            Сколько нужно на подушку по моим тратам?
+          </Button>
+        )}
         {suggestion === 'empty' && (
           <Text size="xs" c="dimmed">
             Мало данных: нужна выписка хотя бы за пару полных месяцев.
@@ -472,19 +634,7 @@ function GoalForm({
           <Button variant="default" onClick={onClose}>
             Отмена
           </Button>
-          <Button
-            disabled={!valid}
-            onClick={() =>
-              onSave({
-                name: goal.name.trim(),
-                target_amount: Number(goal.target_amount).toFixed(2),
-                deadline: mode === 'deadline' ? goal.deadline : null,
-                monthly_amount: mode === 'monthly' ? Number(goal.monthly_amount).toFixed(2) : null,
-                initial_amount: Number(goal.initial_amount || 0).toFixed(2),
-                start_date: goal.start_date || null,
-              })
-            }
-          >
+          <Button disabled={!valid} onClick={() => onSave({ ...payload, name: goal.name.trim() })}>
             Сохранить
           </Button>
         </Group>

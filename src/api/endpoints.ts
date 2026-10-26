@@ -3,6 +3,7 @@
 import { api, request } from './client';
 import type {
   CategoryChange,
+  LoanGoalPreview,
   CategoryIn,
   ExpenseAccount,
   ExpenseAccountIn,
@@ -105,6 +106,7 @@ export const expensesApi = {
   categories: () => api.get<ExpenseCategory[]>(`${V1}/expenses/categories`),
   groups: () => api.get<ExpenseGroup[]>(`${V1}/expenses/groups`),
   goals: (month?: string) => api.get<SavingsGoal[]>(`${V1}/expenses/goals`, { month }),
+  previewGoal: (goal: SavingsGoalIn, month: string) => api.post<LoanGoalPreview>(`${V1}/expenses/goals/preview?month=${enc(month)}`, goal),
   createGoal: (goal: SavingsGoalIn) => api.post<SavingsGoal>(`${V1}/expenses/goals`, goal),
   updateGoal: (id: string, goal: SavingsGoalIn) => api.put<SavingsGoal>(`${V1}/expenses/goals/${enc(id)}`, goal),
   deleteGoal: (id: string) => api.delete<null>(`${V1}/expenses/goals/${enc(id)}`),

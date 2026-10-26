@@ -178,6 +178,7 @@ export function BudgetSection() {
           target_amount: goal.target_amount,
           initial_amount: goal.initial_amount,
           start_date: goal.start_date,
+          loan_id: goal.loan_id,
           // «к сроку»: взнос двигает срок; «взносом» — меняется сам взнос
           deadline: goal.deadline ? (finish ? lastDay(finish) : goal.deadline) : null,
           monthly_amount: goal.deadline ? null : monthly.toFixed(2),
@@ -233,7 +234,9 @@ export function BudgetSection() {
           <Group gap="lg" mt="xs">
             {plan.map((item) => (
               <Group key={item.key + item.label} gap={6}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: `var(--mantine-color-${(COLOR[item.key] ?? 'gray.4').replace('.', '-')})` }} />
+                <div
+                  style={{ width: 10, height: 10, borderRadius: 3, background: `var(--mantine-color-${(COLOR[item.key] ?? 'gray.4').replace('.', '-')})` }}
+                />
                 <Text size="xs">
                   {item.label} {rub(item.value)}
                 </Text>
@@ -243,7 +246,10 @@ export function BudgetSection() {
           <Group justify="space-between" mt="sm">
             <Text fw={600}>Свободно</Text>
             <Text fw={700} size="xl" c={free < 0 ? 'red' : 'teal'}>
-              {rub(free)} <Text span size="sm" c="dimmed">({pctText(free, income)})</Text>
+              {rub(free)}{' '}
+              <Text span size="sm" c="dimmed">
+                ({pctText(free, income)})
+              </Text>
             </Text>
           </Group>
           {free < 0 && (
@@ -360,18 +366,24 @@ export function BudgetSection() {
               const finish = goal.deadline ? goalFinish(goal, monthly, month) : null;
               const moved = goal.deadline && monthly !== initial.goals[goal.id];
               const waits = goal.start_date !== null && goal.start_date.slice(0, 7) > month;
+              // Кредит «к дате»: ЧДП считает график кредита — здесь только смотреть, дату меняют в «Целях».
+              const fixedLoan = Boolean(goal.loan_id && goal.deadline);
               return (
                 <Table.Tr key={goal.id}>
                   <Table.Td pl="xl">
                     <Text size="sm">{goal.name}</Text>
                     <Text size="xs" c={moved ? 'orange' : 'dimmed'}>
-                      {waits
-                        ? `копить с ${fromMonth(goal.start_date!.slice(0, 7))}`
-                        : goal.deadline
-                        ? finish
-                          ? `${moved ? 'срок сдвинется: ' : 'к сроку: '}${monthTitle(moved ? finish : goal.deadline.slice(0, 7)).toLowerCase()}`
-                          : 'взнос 0 — не соберётся'
-                        : 'взнос в месяц'}
+                      {goal.loan_id
+                        ? goal.closes_on
+                          ? `${fixedLoan ? 'ЧДП к дате, ' : ''}закроешь ${goal.closes_on.split('-').reverse().join('.')}${monthly !== initial.goals[goal.id] ? ' (пересчитается после сохранения)' : ''}`
+                          : 'кредит'
+                        : waits
+                          ? `копить с ${fromMonth(goal.start_date!.slice(0, 7))}`
+                          : goal.deadline
+                            ? finish
+                              ? `${moved ? 'срок сдвинется: ' : 'к сроку: '}${monthTitle(moved ? finish : goal.deadline.slice(0, 7)).toLowerCase()}`
+                              : 'взнос 0 — не соберётся'
+                            : 'взнос в месяц'}
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right">
@@ -386,7 +398,13 @@ export function BudgetSection() {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Amount value={monthly} income={income} allowEmpty={false} disabled={waits} onChange={(value) => set('goals', goal.id, value ?? 0)} />
+                    <Amount
+                      value={monthly}
+                      income={income}
+                      allowEmpty={false}
+                      disabled={waits || fixedLoan}
+                      onChange={(value) => set('goals', goal.id, value ?? 0)}
+                    />
                   </Table.Td>
                 </Table.Tr>
               );

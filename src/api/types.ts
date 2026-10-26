@@ -429,6 +429,23 @@ export interface SavingsGoal {
   start_date: IsoDate | null;
   /** Сколько положить в день аванса и остатка зарплаты в этом месяце. */
   paydays: GoalPayday[];
+  /** Цель «закрыть кредит»: взносы — ЧДП по нему, «отложено» — на сколько уменьшился долг. */
+  loan_id: string | null;
+  /** Когда кредит закроется при таких ЧДП. */
+  closes_on: IsoDate | null;
+  /** Сколько процентов не уйдёт банку. */
+  interest_saved: Money | null;
+  note: string | null;
+}
+
+/** Цель «закрыть кредит» до сохранения. */
+export interface LoanGoalPreview {
+  debt: Money;
+  plan: Money;
+  paydays: GoalPayday[];
+  closes_on: IsoDate | null;
+  interest_saved: Money;
+  note: string | null;
 }
 
 export interface GoalPayday {
@@ -444,6 +461,7 @@ export interface SavingsGoalIn {
   monthly_amount?: Money | null;
   initial_amount?: Money;
   start_date?: IsoDate | null;
+  loan_id?: string | null;
 }
 
 export interface ContributionIn {
