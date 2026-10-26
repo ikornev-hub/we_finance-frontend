@@ -32,7 +32,7 @@ import type { AccountKind, ExpenseAccountIn, LoanSummaryOut, ExpenseCategory, Ex
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, currentMonth, monthTitle } from '../components/expenses/common';
-import { MonthTotals, MonthTree } from '../components/expenses/MonthView';
+import { ForecastPanel, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
   SAMPLE_ACCOUNTS,
@@ -111,6 +111,7 @@ function MonthSection() {
               </Group>
             </Alert>
           )}
+          <ForecastPanel report={report.data} />
           <MonthTree report={report.data} onPick={(id, title) => setPicked({ id, title })} />
           {picked && <CategoryOperations month={month} categoryId={picked.id} title={picked.title} />}
         </>
@@ -453,7 +454,7 @@ function CategoriesSection() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Категория</Table.Th>
-                <Table.Th w={200}>Цель, % располагаемого</Table.Th>
+                <Table.Th w={300}>Граница: % располагаемого или сумма</Table.Th>
                 <Table.Th w={60} />
               </Table.Tr>
             </Table.Thead>
@@ -462,9 +463,7 @@ function CategoriesSection() {
                 <Table.Tr key={category.id}>
                   <Table.Td>
                     <Group gap="xs">
-                      <Text fw={600} size="sm">
-                        {category.name}
-                      </Text>
+                      <NameInput name={category.name} bold onSave={(next) => run(() => expensesApi.updateCategory(category.id, { name: next }))} />
                       {category.system_code && (
                         <Badge size="xs" variant="light" color="gray">
                           системная
@@ -473,21 +472,7 @@ function CategoriesSection() {
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    {!category.system_code && (
-                      <NumberInput
-                        size="xs"
-                        w={120}
-                        min={0}
-                        max={100}
-                        suffix=" %"
-                        defaultValue={category.target_share ? Number(category.target_share) * 100 : undefined}
-                        placeholder="нет цели"
-                        onBlur={(event) => {
-                          const value = event.currentTarget.value.replace(/[^\d.,]/g, '').replace(',', '.');
-                          void run(() => expensesApi.updateCategory(category.id, { target_share: value ? String(Number(value) / 100) : null }));
-                        }}
-                      />
-                    )}
+                    {!NO_LIMIT.has(category.system_code ?? '') && <LimitEditor category={category} onSave={(limit) => run(() => expensesApi.updateCategory(category.id, limit))} />}
                   </Table.Td>
                   <Table.Td>
                     {!category.system_code && (
@@ -500,7 +485,7 @@ function CategoriesSection() {
                 ...category.children.map((child) => (
                   <Table.Tr key={child.id}>
                     <Table.Td pl={36}>
-                      <Text size="sm">{child.name}</Text>
+                      <NameInput name={child.name} onSave={(next) => run(() => expensesApi.updateCategory(child.id, { name: next }))} />
                     </Table.Td>
                     <Table.Td />
                     <Table.Td>
@@ -516,6 +501,61 @@ function CategoriesSection() {
         </Panel>
       )}
     </Stack>
+  );
+}
+
+/** Обязательные и доход: границ у них нет (вычитаются из дохода или сами доход). */
+const NO_LIMIT = new Set(['income', 'credit', 'housing']);
+
+/** Имя категории, которое правится на месте: изменил и ушёл из поля — сохранено. */
+function NameInput({ name, bold = false, onSave }: { name: string; bold?: boolean; onSave: (name: string) => void }) {
+  return (
+    <TextInput
+      key={name}
+      defaultValue={name}
+      variant="unstyled"
+      size="sm"
+      w={200}
+      styles={{ input: { fontWeight: bold ? 600 : 400 } }}
+      aria-label="Название категории"
+      onBlur={(event) => {
+        const next = event.currentTarget.value.trim();
+        if (next && next !== name) onSave(next);
+        else event.currentTarget.value = name;
+      }}
+    />
+  );
+}
+
+/** Граница категории: в % от располагаемого или суммой. Пусто — без границы. */
+function LimitEditor({ category, onSave }: { category: ExpenseCategory; onSave: (limit: { target_share: string | null } | { target_amount: string | null }) => void }) {
+  const [mode, setMode] = useState<'share' | 'amount'>(category.target_amount ? 'amount' : 'share');
+  const current = mode === 'amount' ? (category.target_amount ? Number(category.target_amount) : undefined) : category.target_share ? Number(category.target_share) * 100 : undefined;
+  const save = (raw: string) => {
+    const value = raw.replace(/[^\d.,]/g, '').replace(',', '.');
+    if (!value) {
+      onSave({ target_share: null });
+      return;
+    }
+    onSave(mode === 'amount' ? { target_amount: Number(value).toFixed(2) } : { target_share: String(Number(value) / 100) });
+  };
+  return (
+    <Group gap={6} wrap="nowrap">
+      <SegmentedControl size="xs" value={mode} onChange={(next) => setMode(next as 'share' | 'amount')} data={[{ value: 'share', label: '%' }, { value: 'amount', label: '₽' }]} />
+      <NumberInput
+        key={`${mode}-${current ?? ''}`}
+        size="xs"
+        w={130}
+        min={0}
+        max={mode === 'share' ? 100 : undefined}
+        thousandSeparator=" "
+        decimalSeparator=","
+        suffix={mode === 'share' ? ' %' : ' ₽'}
+        defaultValue={current}
+        placeholder="без границы"
+        onBlur={(event) => save(event.currentTarget.value)}
+      />
+    </Group>
   );
 }
 

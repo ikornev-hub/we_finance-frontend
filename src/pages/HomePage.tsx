@@ -7,7 +7,7 @@ import type { IncomeCheck, LoanDetailOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CHECK_BADGE, MonthSwitch, SampleNotice, currentMonth, monthTitle, percent } from '../components/expenses/common';
-import { MonthTotals } from '../components/expenses/MonthView';
+import { MonthTotals, RemainingBadge, limitLabel } from '../components/expenses/MonthView';
 import { SAMPLE_INCOME_CHECK, SAMPLE_MONTH } from '../lib/expenseSamples';
 import { PAYMENT_KIND, date, money, todayIso } from '../lib/format';
 import { useOrSample } from '../lib/sample';
@@ -92,7 +92,7 @@ export function HomePage() {
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
         <Panel
           title="Категории"
-          subtitle="Сумма и доля от располагаемого"
+          subtitle="Факт, доля от располагаемого, граница и сколько ещё можно"
           actions={
             <Button variant="subtle" size="xs" rightSection={<IconArrowRight size={14} />} onClick={() => (window.location.hash = '#expenses/month')}>
               Подробно
@@ -106,7 +106,8 @@ export function HomePage() {
               </Text>
             )}
             {categories.map((category) => {
-              const over = category.deviation !== null && Number(category.deviation) > 0;
+              const over = category.remaining !== null && Number(category.remaining) < 0;
+              const fill = category.target ? (Number(category.amount) / Number(category.target)) * 100 : (Number(category.amount) / max) * 100;
               return (
                 <Stack key={category.id} gap={4}>
                   <Group justify="space-between" wrap="nowrap">
@@ -114,18 +115,21 @@ export function HomePage() {
                       {category.name}
                     </Text>
                     <Group gap="xs" wrap="nowrap">
-                      {over && (
-                        <Badge size="xs" color="red" variant="light">
-                          перерасход
-                        </Badge>
-                      )}
                       <Text size="sm">{money(category.amount)}</Text>
                       <Text size="xs" c="dimmed" w={56} ta="right">
                         {percent(category.share)}
                       </Text>
                     </Group>
                   </Group>
-                  <Progress value={(Number(category.amount) / max) * 100} size="sm" color={over ? 'red' : 'brand'} />
+                  <Progress value={Math.min(fill, 100)} size="sm" color={over ? 'red' : category.target ? 'teal' : 'brand'} />
+                  {category.limit_mode && (
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text size="xs" c="dimmed">
+                        граница {limitLabel(category)}
+                      </Text>
+                      <RemainingBadge category={category} />
+                    </Group>
+                  )}
                 </Stack>
               );
             })}

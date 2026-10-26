@@ -281,7 +281,9 @@ export interface ExpenseCategory {
   /** У подкатегории — id родителя; в дереве у верхнего уровня всегда null. */
   parent_id?: string | null;
   system_code: string | null;
+  /** Граница — либо доля располагаемого, либо сумма; другое поле null. */
   target_share: string | null;
+  target_amount?: Money | null;
   children: { id: string; name: string }[];
 }
 
@@ -289,6 +291,7 @@ export interface CategoryIn {
   name: string;
   parent_id?: string | null;
   target_share?: string | null;
+  target_amount?: Money | null;
 }
 
 export type AccountKind = 'own' | 'credit';
@@ -311,10 +314,27 @@ export interface MonthCategory {
   system_code: string | null;
   amount: Money;
   share: string | null;
+  /** Как задана граница: долей или суммой. */
+  limit_mode: 'share' | 'amount' | null;
   target_share: string | null;
   target: Money | null;
+  /** Факт − граница; > 0 — перерасход. */
   deviation: Money | null;
-  children: { id: string; name: string; amount: Money }[];
+  /** Граница − факт: сколько ещё можно. */
+  remaining: Money | null;
+  children: { id: string; name: string; amount: Money; share: string | null }[];
+}
+
+/** Прогноз «план + факт»: от него доли и границы. */
+export interface MonthForecast {
+  income: Money;
+  credit: Money;
+  housing: Money;
+  disposable: Money;
+  spent: Money;
+  can_spend: Money;
+  limits_total: Money;
+  unallocated: Money;
 }
 
 export interface MonthReport {
@@ -324,7 +344,9 @@ export interface MonthReport {
   balance: Money;
   disposable: Money;
   uncategorized_count: number;
+  has_statement: boolean;
   warnings: string[];
+  forecast: MonthForecast;
   categories: MonthCategory[];
 }
 
