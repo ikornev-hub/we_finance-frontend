@@ -1,9 +1,10 @@
 import { Alert, Badge, ScrollArea, SimpleGrid, Stack, Table, Tabs, Text } from '@mantine/core';
 import { IconCalendarEvent, IconCoins, IconPigMoney, IconReceipt2 } from '@tabler/icons-react';
 
-import type { CalculationOut, HistoryEntryOut, LoanStateOut, PreviewOut, ScheduleRowOut, WarningOut } from '../../api/types';
+import type { CalculationOut, HistoryEntryOut, LoanStateOut, PreviewOut, ScheduleRowOut, WarningOut, PaymentStatus } from '../../api/types';
 import { date, money } from '../../lib/format';
 import { HeroCard, Panel, StatCard } from '../Cards';
+import { PaymentStatusBadge } from '../PaymentStatusBadge';
 
 export function Warnings({ warnings }: { warnings: WarningOut[] }) {
   if (warnings.length === 0) return null;
@@ -18,9 +19,9 @@ export function Warnings({ warnings }: { warnings: WarningOut[] }) {
   );
 }
 
-/** График платежей; past — отметка «уже прошёл» (есть у сохранённых кредитов и полного расчёта). */
-export function ScheduleTable({ rows }: { rows: (ScheduleRowOut & { past?: boolean })[] }) {
-  const withPast = rows.some((row) => row.past !== undefined);
+/** График платежей; status — проведён / сегодня / запланирован (есть у сохранённых кредитов и полного расчёта). */
+export function ScheduleTable({ rows }: { rows: (ScheduleRowOut & { status?: PaymentStatus })[] }) {
+  const withPast = rows.some((row) => row.status !== undefined);
   return (
     <ScrollArea h={rows.length > 14 ? 520 : undefined}>
       <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={720}>
@@ -38,7 +39,7 @@ export function ScheduleTable({ rows }: { rows: (ScheduleRowOut & { past?: boole
         </Table.Thead>
         <Table.Tbody>
           {rows.map((row) => (
-            <Table.Tr key={row.number} opacity={row.past ? 0.6 : 1}>
+            <Table.Tr key={row.number} opacity={row.status === 'done' ? 0.6 : 1} fw={row.status === 'today' ? 600 : undefined}>
               <Table.Td>{row.number}</Table.Td>
               <Table.Td>{date(row.date)}</Table.Td>
               <Table.Td ta="right" fw={600}>
@@ -50,9 +51,7 @@ export function ScheduleTable({ rows }: { rows: (ScheduleRowOut & { past?: boole
               <Table.Td ta="right">{money(row.balance)}</Table.Td>
               {withPast && (
                 <Table.Td>
-                  <Badge variant="light" color={row.past ? 'gray' : 'brand'} radius="sm">
-                    {row.past ? 'Прошёл' : 'Впереди'}
-                  </Badge>
+                  {row.status && <PaymentStatusBadge status={row.status} />}
                 </Table.Td>
               )}
             </Table.Tr>
@@ -83,11 +82,12 @@ export function HistoryTable({ rows }: { rows: HistoryEntryOut[] }) {
             <Table.Th ta="right">Проценты</Table.Th>
             <Table.Th ta="right">Комиссия</Table.Th>
             <Table.Th ta="right">Остаток</Table.Th>
+            <Table.Th>Статус</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {rows.map((row, index) => (
-            <Table.Tr key={index}>
+            <Table.Tr key={index} fw={row.status === 'today' ? 600 : undefined}>
               <Table.Td>{date(row.date)}</Table.Td>
               <Table.Td>
                 <Badge variant="light" color={row.kind === 'prepayment' ? 'brand' : 'gray'} radius="sm">
@@ -101,6 +101,9 @@ export function HistoryTable({ rows }: { rows: HistoryEntryOut[] }) {
               <Table.Td ta="right">{money(row.interest)}</Table.Td>
               <Table.Td ta="right">{money(row.fee)}</Table.Td>
               <Table.Td ta="right">{money(row.balance)}</Table.Td>
+              <Table.Td>
+                <PaymentStatusBadge status={row.status} />
+              </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>

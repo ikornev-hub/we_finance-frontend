@@ -15,11 +15,10 @@ export interface VersionResponse {
   env: string;
 }
 
-export interface MoneyRoundResponse {
-  amount: Money;
-}
-
 // ---------- зарплата ----------
+
+/** Статус денежного события на дату: проведён, сегодня, запланирован. */
+export type PaymentStatus = 'done' | 'today' | 'planned';
 
 export type AbsenceKind = 'vacation' | 'sick' | 'unpaid';
 export type PaymentKind = 'advance' | 'remainder' | 'vacation' | 'sick_employer' | 'sick_fund';
@@ -63,7 +62,9 @@ export interface PaymentOut {
   gross: Money;
   tax: Money;
   net: Money;
+  /** То же, что status === 'done'. */
   received: boolean;
+  status: PaymentStatus;
 }
 
 export interface MonthTotalOut {
@@ -153,7 +154,9 @@ export interface ScheduleRowOut {
 }
 
 export interface ScheduleItemOut extends ScheduleRowOut {
+  /** То же, что status === 'done'. */
   past: boolean;
+  status: PaymentStatus;
 }
 
 export interface HistoryEntryOut {
@@ -164,6 +167,7 @@ export interface HistoryEntryOut {
   interest: Money;
   fee: Money;
   balance: Money;
+  status: PaymentStatus;
 }
 
 export interface LoanStateOut {

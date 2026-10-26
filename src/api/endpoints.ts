@@ -11,7 +11,6 @@ import type {
   LoanIn,
   LoanStatus,
   LoanSummaryOut,
-  MoneyRoundResponse,
   Prepayment,
   PreviewOut,
   SalaryCalculationIn,
@@ -35,7 +34,6 @@ export const serviceApi = {
   // 503 — API живо, но база недоступна: это тоже ответ, а не ошибка связи.
   health: () => request<HealthResponse>('GET', '/health', { accept: [503] }),
   version: () => api.get<VersionResponse>('/version'),
-  round: (amount: string) => api.get<MoneyRoundResponse>(`${V1}/money/round`, { amount }),
 };
 
 export const salaryApi = {

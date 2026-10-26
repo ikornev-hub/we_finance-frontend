@@ -14,6 +14,7 @@ import { ApiError } from '../api/client';
 import { loansApi, salaryApi } from '../api/endpoints';
 import type { LoanDetailOut, PaymentOut, YearReportOut } from '../api/types';
 import { HeroCard, PageHeader, Panel, StatCard } from '../components/Cards';
+import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { PAYMENT_KIND, date, money, todayIso } from '../lib/format';
 
@@ -73,7 +74,7 @@ export function HomePage() {
   const payments: PaymentOut[] = income.data?.payments ?? [];
   const incomeThisMonth = payments.filter((payment) => payment.date.startsWith(month));
   const incomeNet = sum(incomeThisMonth.map((payment) => payment.net));
-  const incomeReceived = sum(incomeThisMonth.filter((payment) => payment.received).map((payment) => payment.net));
+  const incomeReceived = sum(incomeThisMonth.filter((payment) => payment.status === 'done').map((payment) => payment.net));
 
   const loanList = loans.data ?? [];
   const loanRowsThisMonth = loanList.flatMap((loan) =>
@@ -87,7 +88,7 @@ export function HomePage() {
 
   const events: Event[] = [
     ...payments
-      .filter((payment) => !payment.received)
+      .filter((payment) => payment.status !== 'done')
       .map((payment) => ({
         date: payment.date,
         title: PAYMENT_KIND[payment.kind] ?? payment.kind,
@@ -96,7 +97,7 @@ export function HomePage() {
       })),
     ...loanList.flatMap((loan) =>
       loan.schedule
-        .filter((row) => !row.past)
+        .filter((row) => row.status !== 'done')
         .map((row) => ({ date: row.date, title: `Платёж: ${loan.name}`, amount: row.payment, direction: 'out' as const })),
     ),
   ]
@@ -179,7 +180,12 @@ export function HomePage() {
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{event.title}</Text>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text size="sm" fw={event.date === today ? 600 : undefined}>
+                          {event.title}
+                        </Text>
+                        {event.date === today && <PaymentStatusBadge status="today" />}
+                      </Group>
                     </Table.Td>
                     <Table.Td ta="right">
                       <Text size="sm" fw={600} c={event.direction === 'in' ? 'teal' : undefined}>

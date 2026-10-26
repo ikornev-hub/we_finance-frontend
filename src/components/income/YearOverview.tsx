@@ -6,6 +6,7 @@ import { IconCalendarDue, IconCash, IconChevronDown, IconChevronUp, IconReceiptT
 import type { PaymentOut, YearReportOut } from '../../api/types';
 import { MONTHS, PAYMENT_KIND, date, money } from '../../lib/format';
 import { HeroCard, Panel, StatCard } from '../Cards';
+import { PaymentStatusBadge } from '../PaymentStatusBadge';
 
 const MONTH_NAMES = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -31,7 +32,7 @@ function grossOfKinds(payments: PaymentOut[], kinds: string[]): string {
 type MonthStatus = 'done' | 'partly' | 'ahead';
 
 function monthStatus(payments: PaymentOut[]): MonthStatus {
-  const received = payments.filter((payment) => payment.received).length;
+  const received = payments.filter((payment) => payment.status === 'done').length;
   if (received === 0) return 'ahead';
   return received === payments.length ? 'done' : 'partly';
 }
@@ -46,8 +47,9 @@ const STATUS_BADGE: Record<MonthStatus, { text: string; color: string }> = {
 export function YearOverview({ report }: { report: YearReportOut }) {
   const [paymentsOpen, payments] = useDisclosure(false);
 
-  const received = report.payments.filter((payment) => payment.received);
-  const ahead = report.payments.filter((payment) => !payment.received);
+  const received = report.payments.filter((payment) => payment.status === 'done');
+  // «Впереди» — сегодняшние и запланированные: сегодняшняя выплата ещё не учтена.
+  const ahead = report.payments.filter((payment) => payment.status !== 'done');
   const next = ahead[0];
   const taxRate = Number(report.gross) > 0 ? (Number(report.tax) / Number(report.gross)) * 100 : 0;
 
@@ -210,9 +212,7 @@ export function YearOverview({ report }: { report: YearReportOut }) {
                       {money(payment.net)}
                     </Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={payment.received ? 'teal' : 'gray'} radius="sm">
-                        {payment.received ? 'Получено' : 'Впереди'}
-                      </Badge>
+                      <PaymentStatusBadge status={payment.status} />
                     </Table.Td>
                   </Table.Tr>
                 ))}
