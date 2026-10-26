@@ -15,7 +15,10 @@ import {
 import { useEffect, useState } from 'react';
 
 import { ApiError } from '../api/client';
-import { salaryApi } from '../api/endpoints';
+import { expensesApi, salaryApi } from '../api/endpoints';
+import { SampleNotice } from '../components/expenses/common';
+import { SAMPLE_INCOME_CHECK } from '../lib/expenseSamples';
+import { useOrSample } from '../lib/sample';
 import type { Absence, AbsenceKind, SalaryProfile, SalaryTerms, WhatIfOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
@@ -93,6 +96,7 @@ function OverviewSection() {
   const report = useAction<YearReportOut>();
   const { run } = report;
   const [absenceOpen, absenceModal] = useDisclosure(false);
+  const checks = useOrSample(() => expensesApi.incomeCheck(year), SAMPLE_INCOME_CHECK, String(year));
 
   useEffect(() => {
     void run(() => salaryApi.year(year));
@@ -130,7 +134,8 @@ function OverviewSection() {
         </Group>
       </Group>
       <ReportError error={report.error} />
-      {report.data && <YearOverview report={report.data} />}
+      {checks.sample && report.data && <SampleNotice what="Колонка «Выписка» в выплатах" />}
+      {report.data && <YearOverview report={report.data} checks={checks.data ?? undefined} />}
       <Modal opened={absenceOpen} onClose={absenceModal.close} title="Отпуск, больничный или день без оплаты" radius="lg" centered>
         <AbsenceForm netBefore={report.data?.net ?? null} onDone={afterAbsence} />
       </Modal>

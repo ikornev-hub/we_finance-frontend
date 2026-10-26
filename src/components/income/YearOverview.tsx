@@ -3,7 +3,8 @@ import { BarChart } from '@mantine/charts';
 import { useDisclosure } from '@mantine/hooks';
 import { IconCalendarDue, IconCash, IconChevronDown, IconChevronUp, IconReceiptTax, IconWallet } from '@tabler/icons-react';
 
-import type { PaymentOut, YearReportOut } from '../../api/types';
+import type { IncomeCheck, PaymentOut, YearReportOut } from '../../api/types';
+import { CHECK_BADGE } from '../expenses/common';
 import { MONTHS, PAYMENT_KIND, date, money } from '../../lib/format';
 import { HeroCard, Panel, StatCard } from '../Cards';
 import { PaymentStatusBadge } from '../PaymentStatusBadge';
@@ -44,7 +45,8 @@ const STATUS_BADGE: Record<MonthStatus, { text: string; color: string }> = {
 };
 
 /** Главная «Доходов»: итоги года, ближайшая выплата, годовой отчёт по месяцам (как лист Excel), все выплаты. */
-export function YearOverview({ report }: { report: YearReportOut }) {
+export function YearOverview({ report, checks }: { report: YearReportOut; checks?: IncomeCheck[] }) {
+  const checkOf = (paymentDate: string, kind: string) => checks?.find((check) => check.date === paymentDate && check.kind === kind);
   const [paymentsOpen, payments] = useDisclosure(false);
 
   const received = report.payments.filter((payment) => payment.status === 'done');
@@ -198,6 +200,7 @@ export function YearOverview({ report }: { report: YearReportOut }) {
                   <Table.Th ta="right">НДФЛ</Table.Th>
                   <Table.Th ta="right">На руки</Table.Th>
                   <Table.Th>Статус</Table.Th>
+                  {checks && <Table.Th>Выписка</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -214,6 +217,11 @@ export function YearOverview({ report }: { report: YearReportOut }) {
                     <Table.Td>
                       <PaymentStatusBadge status={payment.status} />
                     </Table.Td>
+                    {checks && (
+                      <Table.Td>
+                        <StatementCheck check={checkOf(payment.date, payment.kind)} />
+                      </Table.Td>
+                    )}
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -228,6 +236,24 @@ export function YearOverview({ report }: { report: YearReportOut }) {
           </Group>
         )}
       </Panel>
+    </Stack>
+  );
+}
+
+/** Сверка выплаты с выпиской: пришло, расхождение, не найдено… */
+function StatementCheck({ check }: { check: IncomeCheck | undefined }) {
+  if (!check) return <Text size="xs" c="dimmed">—</Text>;
+  const badge = CHECK_BADGE[check.status];
+  return (
+    <Stack gap={0}>
+      <Badge variant="light" color={badge.color} radius="sm">
+        {badge.text}
+      </Badge>
+      {check.status === 'mismatch' && (
+        <Text size="xs" c="orange">
+          пришло {money(check.operation_amount)}
+        </Text>
+      )}
     </Stack>
   );
 }

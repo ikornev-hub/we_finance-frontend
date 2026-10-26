@@ -2,6 +2,15 @@
 
 import { api, request } from './client';
 import type {
+  CategoryChange,
+  CategoryIn,
+  ExpenseAccount,
+  ExpenseAccountIn,
+  ExpenseCategory,
+  ExpenseOperation,
+  ImportResult,
+  IncomeCheck,
+  MonthReport,
   Absence,
   CalculationIn,
   CalculationOut,
@@ -64,4 +73,33 @@ export const loansApi = {
 export const calculatorApi = {
   schedule: (loan: LoanIn) => api.post<ScheduleRowOut[]>(`${V1}/calculator/schedule`, loan),
   calculate: (body: CalculationIn) => api.post<CalculationOut>(`${V1}/calculator/calculate`, body),
+};
+
+const enc = encodeURIComponent;
+
+export const expensesApi = {
+  importStatement: (bank: string, file: File) => {
+    const form = new FormData();
+    form.append('bank', bank);
+    form.append('file', file);
+    return api.post<ImportResult>(`${V1}/expenses/imports`, form);
+  },
+  operations: (query: { month?: string; category_id?: string; uncategorized?: boolean }) =>
+    api.get<ExpenseOperation[]>(`${V1}/expenses/operations`, {
+      month: query.month,
+      category_id: query.category_id,
+      uncategorized: query.uncategorized ? 'true' : undefined,
+    }),
+  setCategory: (id: string, categoryId: string, remember: boolean) =>
+    api.patch<CategoryChange>(`${V1}/expenses/operations/${enc(id)}`, { category_id: categoryId, remember }),
+  categories: () => api.get<ExpenseCategory[]>(`${V1}/expenses/categories`),
+  createCategory: (category: CategoryIn) => api.post<ExpenseCategory>(`${V1}/expenses/categories`, category),
+  updateCategory: (id: string, patch: Partial<CategoryIn>) =>
+    api.patch<ExpenseCategory>(`${V1}/expenses/categories/${enc(id)}`, patch),
+  deleteCategory: (id: string) => api.delete<null>(`${V1}/expenses/categories/${enc(id)}`),
+  accounts: () => api.get<ExpenseAccount[]>(`${V1}/expenses/accounts`),
+  createAccount: (account: ExpenseAccountIn) => api.post<ExpenseAccount>(`${V1}/expenses/accounts`, account),
+  deleteAccount: (id: string) => api.delete<null>(`${V1}/expenses/accounts/${enc(id)}`),
+  month: (month: string) => api.get<MonthReport>(`${V1}/expenses/months/${enc(month)}`),
+  incomeCheck: (year: number) => api.get<IncomeCheck[]>(`${V1}/expenses/income-check/${year}`),
 };

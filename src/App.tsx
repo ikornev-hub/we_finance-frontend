@@ -1,5 +1,6 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
+import { ExpensesPage, type ExpensesSection } from './pages/ExpensesPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { useToken } from './lib/session';
@@ -28,6 +29,9 @@ function SignedIn() {
       break;
     case 'income':
       page = <IncomePage section={route.section.id as IncomeSection} />;
+      break;
+    case 'expenses':
+      page = <ExpensesPage section={route.section.id as ExpensesSection} />;
       break;
     case 'system':
       page = <ServicePage />;

@@ -1,6 +1,11 @@
 import {
   IconBuildingBank,
   IconArchive,
+  IconCategory,
+  IconCreditCard,
+  IconFileUpload,
+  IconListCheck,
+  IconReportMoney,
   IconCalculator,
   IconChartBar,
   IconCirclePlus,
@@ -15,7 +20,7 @@ import type { ReactNode } from 'react';
 
 // Навигация: вкладки сверху, разделы вкладки — иконки в левой колонке. Адрес: #вкладка/раздел[/параметр].
 
-export type TabId = 'home' | 'income' | 'loans' | 'calculator' | 'system';
+export type TabId = 'home' | 'income' | 'expenses' | 'loans' | 'calculator' | 'system';
 
 export interface Section {
   id: string;
@@ -48,6 +53,17 @@ export const TABS: Tab[] = [
       { id: 'overview', label: 'Отчёт', icon: <IconChartBar size={size} /> },
       { id: 'whatif', label: 'Что если', icon: <IconSparkles size={size} /> },
       { id: 'data', label: 'Мои данные', icon: <IconUserEdit size={size} />, hidden: true },
+    ],
+  },
+  {
+    id: 'expenses',
+    label: 'Расходы',
+    sections: [
+      { id: 'month', label: 'Месяц', icon: <IconReportMoney size={size} /> },
+      { id: 'review', label: 'Без категории', icon: <IconListCheck size={size} /> },
+      { id: 'import', label: 'Загрузить выписку', icon: <IconFileUpload size={size} /> },
+      { id: 'categories', label: 'Категории', icon: <IconCategory size={size} /> },
+      { id: 'accounts', label: 'Свои счета', icon: <IconCreditCard size={size} /> },
     ],
   },
   {

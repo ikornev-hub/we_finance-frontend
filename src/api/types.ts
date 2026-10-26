@@ -222,3 +222,109 @@ export interface PreviewOut {
   months_saved: number;
   warnings: WarningOut[];
 }
+
+// ---------- Расходы (контракт: analysts/requirements/system/expenses.md §3) ----------
+
+export type OperationType =
+  | 'income'
+  | 'card'
+  | 'payment'
+  | 'transfer_own'
+  | 'transfer_credit'
+  | 'transfer_person'
+  | 'transfer_in';
+
+export interface ImportResult {
+  import_id: string;
+  total: number;
+  new: number;
+  duplicates: number;
+  uncategorized: number;
+}
+
+export interface ExpenseOperation {
+  id: string;
+  operated_at: IsoDate;
+  amount: Money;
+  description: string;
+  merchant: string | null;
+  counterparty: string | null;
+  type: OperationType;
+  category_id: string | null;
+  category_path: string | null;
+}
+
+export interface ExpenseRule {
+  id: string;
+  match_kind: 'counterparty' | 'merchant';
+  pattern: string;
+  category_id: string;
+}
+
+export interface CategoryChange {
+  operation: ExpenseOperation;
+  rule: ExpenseRule | null;
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  system_code: string | null;
+  target_share: string | null;
+  children: { id: string; name: string }[];
+}
+
+export interface CategoryIn {
+  name: string;
+  parent_id?: string | null;
+  target_share?: string | null;
+}
+
+export type AccountKind = 'own' | 'credit';
+
+export interface ExpenseAccount {
+  id: string;
+  bank: string;
+  name: string;
+  kind: AccountKind;
+  number_tail: string | null;
+  phone: string | null;
+  loan_id: string | null;
+}
+
+export type ExpenseAccountIn = Omit<ExpenseAccount, 'id'>;
+
+export interface MonthCategory {
+  id: string;
+  name: string;
+  system_code: string | null;
+  amount: Money;
+  share: string | null;
+  target_share: string | null;
+  target: Money | null;
+  deviation: Money | null;
+  children: { id: string; name: string; amount: Money }[];
+}
+
+export interface MonthReport {
+  month: string;
+  income: Money;
+  expenses: Money;
+  balance: Money;
+  disposable: Money;
+  uncategorized_count: number;
+  warnings: string[];
+  categories: MonthCategory[];
+}
+
+export type IncomeCheckStatus = 'confirmed' | 'mismatch' | 'missing' | 'no_statement' | 'expected';
+
+export interface IncomeCheck {
+  date: IsoDate;
+  kind: PaymentKind;
+  expected: Money;
+  status: IncomeCheckStatus;
+  operation_date: IsoDate | null;
+  operation_amount: Money | null;
+  difference: Money | null;
+}

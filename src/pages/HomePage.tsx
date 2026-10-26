@@ -1,35 +1,17 @@
-import { Alert, Badge, Button, Group, SimpleGrid, Skeleton, Stack, Table, Text } from '@mantine/core';
-import {
-  IconArrowRight,
-  IconBuildingBank,
-  IconCalendarDue,
-  IconCash,
-  IconInfoCircle,
-  IconPigMoney,
-  IconWallet,
-} from '@tabler/icons-react';
+import { Alert, Badge, Button, Group, Progress, SimpleGrid, Stack, Table, Text } from '@mantine/core';
+import { IconArrowRight, IconCalendarDue, IconListSearch } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import { ApiError } from '../api/client';
-import { loansApi, salaryApi } from '../api/endpoints';
-import type { LoanDetailOut, PaymentOut, YearReportOut } from '../api/types';
-import { HeroCard, PageHeader, Panel, StatCard } from '../components/Cards';
-import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
+import { expensesApi, loansApi, salaryApi } from '../api/endpoints';
+import type { IncomeCheck, LoanDetailOut, YearReportOut } from '../api/types';
+import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
+import { CHECK_BADGE, MonthSwitch, SampleNotice, currentMonth, monthTitle, percent } from '../components/expenses/common';
+import { MonthTotals } from '../components/expenses/MonthView';
+import { SAMPLE_INCOME_CHECK, SAMPLE_MONTH } from '../lib/expenseSamples';
 import { PAYMENT_KIND, date, money, todayIso } from '../lib/format';
+import { useOrSample } from '../lib/sample';
 
-/** Сумма денег-строк без float: в копейках как целые. */
-function sum(values: string[]): string {
-  const cents = values.reduce((total, value) => total + Math.round(Number(value) * 100), 0);
-  return (cents / 100).toFixed(2);
-}
-
-const MONTH_NOMINATIVE = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-];
-
-/** Одно событие ленты «что будет дальше»: поступление или платёж по кредиту. */
 interface Event {
   date: string;
   title: string;
@@ -37,65 +19,42 @@ interface Event {
   direction: 'in' | 'out';
 }
 
-type Load<T> = { data: T | null; error: unknown; loading: boolean };
-
-function useLoad<T>(fn: () => Promise<T>): Load<T> {
-  const [state, setState] = useState<Load<T>>({ data: null, error: null, loading: true });
+function useLoad<T>(fn: () => Promise<T>): { data: T | null; error: unknown } {
+  const [state, setState] = useState<{ data: T | null; error: unknown }>({ data: null, error: null });
   useEffect(() => {
     fn()
-      .then((data) => setState({ data, error: null, loading: false }))
-      .catch((error) => setState({ data: null, error, loading: false }));
+      .then((data) => setState({ data, error: null }))
+      .catch((error) => setState({ data: null, error }));
     // Загружается один раз при открытии главной.
   }, []);
   return state;
 }
 
-const isNotFound = (error: unknown) => error instanceof ApiError && error.status === 404;
-
 /**
- * Главная: «как у меня с деньгами в этом месяце».
- * Доход месяца, платежи по кредитам, сколько остаётся, и лента ближайших событий.
+ * Главная: месяц целиком — доходы, расходы по категориям, остаток;
+ * пришли ли доходы по выписке; что дальше по зарплате и кредитам.
  */
 export function HomePage() {
   const today = todayIso();
-  const year = Number(today.slice(0, 4));
-  const month = today.slice(0, 7);
-  const monthIndex = Number(today.slice(5, 7)) - 1;
+  const [month, setMonth] = useState(currentMonth());
+  const year = Number(month.slice(0, 4));
 
-  const income = useLoad<YearReportOut>(() => salaryApi.year(year));
+  const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);
+  const checks = useOrSample(() => expensesApi.incomeCheck(year), SAMPLE_INCOME_CHECK, String(year));
+  const salary = useLoad<YearReportOut>(() => salaryApi.year(Number(today.slice(0, 4))));
   const loans = useLoad<LoanDetailOut[]>(async () => {
-    // Завершённые учитываются везде, как активные; удалённые — нигде (С8).
     const [active, completed] = await Promise.all([loansApi.list(), loansApi.list(undefined, 'completed')]);
-    const list = [...active, ...completed];
-    return Promise.all(list.map((loan) => loansApi.detail(loan.id)));
+    return Promise.all([...active, ...completed].map((loan) => loansApi.detail(loan.id)));
   });
 
-  const noIncome = isNotFound(income.error);
-  const payments: PaymentOut[] = income.data?.payments ?? [];
-  const incomeThisMonth = payments.filter((payment) => payment.date.startsWith(month));
-  const incomeNet = sum(incomeThisMonth.map((payment) => payment.net));
-  const incomeReceived = sum(incomeThisMonth.filter((payment) => payment.status === 'done').map((payment) => payment.net));
-
-  const loanList = loans.data ?? [];
-  const loanRowsThisMonth = loanList.flatMap((loan) =>
-    loan.schedule.filter((row) => row.date.startsWith(month)).map((row) => ({ loan, row })),
-  );
-  const loanOut = sum(loanRowsThisMonth.map(({ row }) => row.payment));
-  const debt = sum(loanList.map((loan) => loan.actual.balance));
-  const lastClose = loanList.map((loan) => loan.actual.close_date).sort().at(-1);
-
-  const free = sum([incomeNet, `-${loanOut}`]);
+  const monthChecks: IncomeCheck[] = (checks.data ?? []).filter((check) => check.date.startsWith(month));
+  const confirmed = monthChecks.filter((check) => check.status === 'confirmed').length;
 
   const events: Event[] = [
-    ...payments
+    ...(salary.data?.payments ?? [])
       .filter((payment) => payment.status !== 'done')
-      .map((payment) => ({
-        date: payment.date,
-        title: PAYMENT_KIND[payment.kind] ?? payment.kind,
-        amount: payment.net,
-        direction: 'in' as const,
-      })),
-    ...loanList.flatMap((loan) =>
+      .map((payment) => ({ date: payment.date, title: PAYMENT_KIND[payment.kind] ?? payment.kind, amount: payment.net, direction: 'in' as const })),
+    ...(loans.data ?? []).flatMap((loan) =>
       loan.schedule
         .filter((row) => row.status !== 'done')
         .map((row) => ({ date: row.date, title: `Платёж: ${loan.name}`, amount: row.payment, direction: 'out' as const })),
@@ -103,150 +62,144 @@ export function HomePage() {
   ]
     .filter((event) => event.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 8);
+    .slice(0, 6);
 
-  const loading = income.loading || loans.loading;
+  const categories = (report.data?.categories ?? []).filter((category) => Number(category.amount) !== 0);
+  const max = Math.max(...categories.map((category) => Number(category.amount)), 1);
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title={`${MONTH_NOMINATIVE[monthIndex]} ${year}`}
-        subtitle="Сколько придёт в этом месяце, сколько уйдёт на кредиты и что остаётся."
-      />
+      <Group justify="space-between" align="flex-start">
+        <PageHeader title={monthTitle(month)} subtitle="Сколько пришло, куда ушло и что осталось." />
+        <MonthSwitch month={month} onChange={setMonth} />
+      </Group>
 
-      {noIncome && (
-        <Alert color="blue" radius="lg" variant="light" icon={<IconInfoCircle size={18} />} title="Доходы ещё не заполнены">
+      {report.sample && <SampleNotice what="Доходы, расходы и категории месяца" />}
+      <ErrorAlert error={report.error} />
+      {report.data && <MonthTotals report={report.data} />}
+
+      {report.data && report.data.uncategorized_count > 0 && (
+        <Alert color="orange" radius="lg" variant="light" icon={<IconListSearch size={18} />} title={`Ждут разбора: ${report.data.uncategorized_count}`}>
           <Group justify="space-between">
-            <Text size="sm">Без них главная не посчитает, сколько остаётся после кредитов.</Text>
-            <Button size="xs" variant="light" onClick={() => (window.location.hash = '#income/data')}>
-              Заполнить доходы
+            <Text size="sm">Операции без категории не попадают в цели и доли.</Text>
+            <Button size="xs" color="orange" variant="light" onClick={() => (window.location.hash = '#expenses/review')}>
+              Разобрать
             </Button>
           </Group>
         </Alert>
       )}
-      {!noIncome && <ErrorAlert error={income.error} />}
-      <ErrorAlert error={loans.error} />
-
-      {loading ? (
-        <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="md">
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton key={index} h={128} radius="lg" />
-          ))}
-        </SimpleGrid>
-      ) : (
-        <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="md">
-          <HeroCard
-            label="Останется в этом месяце"
-            value={noIncome ? '—' : money(free)}
-            caption="Доход месяца на руки минус платежи по кредитам"
-            icon={<IconPigMoney size={18} />}
-          />
-          <StatCard
-            label="Доход в этом месяце"
-            value={noIncome ? '—' : money(incomeNet)}
-            icon={<IconWallet size={16} />}
-            badge={noIncome ? undefined : { text: `получено ${money(incomeReceived)}`, color: 'teal' }}
-          />
-          <StatCard
-            label="Кредиты в этом месяце"
-            value={money(loanOut)}
-            icon={<IconCash size={16} />}
-            badge={{ text: `${loanRowsThisMonth.length} платеж(а)`, color: 'gray' }}
-          />
-          <StatCard
-            label="Долг по кредитам"
-            value={money(debt)}
-            icon={<IconBuildingBank size={16} />}
-            badge={lastClose ? { text: `до ${date(lastClose)}`, color: 'brand' } : { text: 'кредитов нет', color: 'gray' }}
-          />
-        </SimpleGrid>
-      )}
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-        <Panel title="Что дальше" subtitle="Ближайшие поступления и платежи по кредитам">
-          {events.length === 0 ? (
-            <Text size="sm" c="dimmed">
-              {loading ? 'Загружаю…' : 'Ничего не запланировано.'}
-            </Text>
-          ) : (
-            <Table verticalSpacing="xs" highlightOnHover>
-              <Table.Tbody>
-                {events.map((event, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td w={110}>
-                      <Group gap={6} wrap="nowrap">
-                        <IconCalendarDue size={14} />
-                        <Text size="sm">{date(event.date)}</Text>
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs" wrap="nowrap">
-                        <Text size="sm" fw={event.date === today ? 600 : undefined}>
-                          {event.title}
-                        </Text>
-                        {event.date === today && <PaymentStatusBadge status="today" />}
-                      </Group>
-                    </Table.Td>
-                    <Table.Td ta="right">
-                      <Text size="sm" fw={600} c={event.direction === 'in' ? 'teal' : undefined}>
-                        {event.direction === 'in' ? '+' : '−'}
-                        {money(event.amount)}
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
-        </Panel>
-
-        <Panel title="Кредиты" subtitle="Остаток и ближайший платёж">
+        <Panel
+          title="Категории"
+          subtitle="Сумма и доля от располагаемого"
+          actions={
+            <Button variant="subtle" size="xs" rightSection={<IconArrowRight size={14} />} onClick={() => (window.location.hash = '#expenses/month')}>
+              Подробно
+            </Button>
+          }
+        >
           <Stack gap="sm">
-            {loanList.length === 0 && (
+            {categories.length === 0 && (
               <Text size="sm" c="dimmed">
-                {loading ? 'Загружаю…' : 'Кредитов нет.'}
+                Трат за месяц нет — загрузи выписку.
               </Text>
             )}
-            {loanList.map((loan) => (
-              <Group key={loan.id} justify="space-between" wrap="nowrap">
-                <Stack gap={0}>
-                  <Text size="sm" fw={600}>
-                    {loan.name}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    остаток {money(loan.actual.balance)} · закрытие {date(loan.actual.close_date)}
-                  </Text>
+            {categories.map((category) => {
+              const over = category.deviation !== null && Number(category.deviation) > 0;
+              return (
+                <Stack key={category.id} gap={4}>
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="sm" fw={600}>
+                      {category.name}
+                    </Text>
+                    <Group gap="xs" wrap="nowrap">
+                      {over && (
+                        <Badge size="xs" color="red" variant="light">
+                          перерасход
+                        </Badge>
+                      )}
+                      <Text size="sm">{money(category.amount)}</Text>
+                      <Text size="xs" c="dimmed" w={56} ta="right">
+                        {percent(category.share)}
+                      </Text>
+                    </Group>
+                  </Group>
+                  <Progress value={(Number(category.amount) / max) * 100} size="sm" color={over ? 'red' : 'brand'} />
                 </Stack>
-                <Group gap="xs" wrap="nowrap">
-                  {loan.actual.next_payment && (
-                    <Badge variant="light" color="gray" radius="sm">
-                      {date(loan.actual.next_payment.date)}: {money(loan.actual.next_payment.payment)}
-                    </Badge>
-                  )}
-                  <Button
-                    variant="subtle"
-                    size="xs"
-                    px={6}
-                    onClick={() => (window.location.hash = `#loans/list/${loan.id}`)}
-                    aria-label={`Открыть ${loan.name}`}
-                  >
-                    <IconArrowRight size={16} />
-                  </Button>
-                </Group>
-              </Group>
-            ))}
+              );
+            })}
           </Stack>
         </Panel>
-      </SimpleGrid>
 
-      <Group gap="sm">
-        <Button variant="default" rightSection={<IconArrowRight size={16} />} onClick={() => (window.location.hash = '#income/overview')}>
-          Отчёт о доходах
-        </Button>
-        <Button variant="default" rightSection={<IconArrowRight size={16} />} onClick={() => (window.location.hash = '#loans/list')}>
-          Все кредиты
-        </Button>
-      </Group>
+        <Stack gap="lg">
+          <Panel title="Доходы по выписке" subtitle={monthChecks.length ? `Подтверждено ${confirmed} из ${monthChecks.length}` : 'Сверка расчёта с выпиской'}>
+            {checks.sample && <SampleNotice what="Сверка доходов" />}
+            <ErrorAlert error={checks.error} />
+            {monthChecks.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                В этом месяце выплат по расчёту нет.
+              </Text>
+            ) : (
+              <Table verticalSpacing="xs">
+                <Table.Tbody>
+                  {monthChecks.map((check) => (
+                    <Table.Tr key={`${check.date}-${check.kind}`}>
+                      <Table.Td w={100}>{date(check.date)}</Table.Td>
+                      <Table.Td>{PAYMENT_KIND[check.kind] ?? check.kind}</Table.Td>
+                      <Table.Td ta="right">{money(check.expected)}</Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color={CHECK_BADGE[check.status].color} radius="sm">
+                          {CHECK_BADGE[check.status].text}
+                        </Badge>
+                        {check.status === 'mismatch' && check.difference && (
+                          <Text size="xs" c="orange">
+                            пришло {money(check.operation_amount)} ({money(check.difference)})
+                          </Text>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
+          </Panel>
+
+          <Panel title="Что дальше" subtitle="Ближайшие выплаты и платежи по кредитам">
+            {events.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                Ничего не запланировано.
+              </Text>
+            ) : (
+              <Table verticalSpacing="xs">
+                <Table.Tbody>
+                  {events.map((event, index) => (
+                    <Table.Tr key={index}>
+                      <Table.Td w={110}>
+                        <Group gap={6} wrap="nowrap">
+                          <IconCalendarDue size={14} />
+                          <Text size="sm" fw={event.date === today ? 600 : undefined}>
+                            {event.date === today ? 'Сегодня' : date(event.date)}
+                          </Text>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">{event.title}</Text>
+                      </Table.Td>
+                      <Table.Td ta="right">
+                        <Text size="sm" fw={600} c={event.direction === 'in' ? 'teal' : undefined}>
+                          {event.direction === 'in' ? '+' : '−'}
+                          {money(event.amount)}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
+          </Panel>
+        </Stack>
+      </SimpleGrid>
     </Stack>
   );
 }
