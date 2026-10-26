@@ -114,7 +114,8 @@ export const expensesApi = {
   createCategory: (category: CategoryIn) => api.post<ExpenseCategory>(`${V1}/expenses/categories`, category),
   updateCategory: (id: string, patch: Partial<CategoryIn>) =>
     api.patch<ExpenseCategory>(`${V1}/expenses/categories/${enc(id)}`, patch),
-  deleteCategory: (id: string) => api.delete<null>(`${V1}/expenses/categories/${enc(id)}`),
+  deleteCategory: (id: string, moveTo?: string) =>
+    api.delete<null>(`${V1}/expenses/categories/${enc(id)}${moveTo ? `?move_to=${enc(moveTo)}` : ''}`),
   accounts: () => api.get<ExpenseAccount[]>(`${V1}/expenses/accounts`),
   createAccount: (account: ExpenseAccountIn) => api.post<ExpenseAccount>(`${V1}/expenses/accounts`, account),
   deleteAccount: (id: string) => api.delete<null>(`${V1}/expenses/accounts/${enc(id)}`),

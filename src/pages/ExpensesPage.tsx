@@ -6,6 +6,7 @@ import {
   Checkbox,
   FileInput,
   Group,
+  Modal,
   NumberInput,
   SegmentedControl,
   Select,
@@ -17,6 +18,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  IconArrowsMove,
   IconCheck,
   IconFileSpreadsheet,
   IconInfoCircle,
@@ -519,7 +521,10 @@ function CategoriesSection() {
   const [group, setGroup] = useState<string | null>(null);
   const change = useAction<unknown>();
 
-  const groupList = groups.data ?? [];
+  // Пустую группу не показываем (решение 2026-10-27: «Покупки» стали категорией).
+  const groupList = (groups.data ?? []).filter((item) => item.category_ids.length > 0);
+  const [deleting, setDeleting] = useState<{ id: string; name: string; isTop: boolean; hasChildren: boolean; parentId: string | null } | null>(null);
+  const [moving, setMoving] = useState<{ id: string; name: string; isTop: boolean } | null>(null);
   const managed = groupList.find((item) => item.code === 'managed')?.id ?? null;
   const groupOptions = [...groupList.map((item) => ({ value: item.id, label: item.name })), { value: SERVICE, label: 'Служебные' }];
   const codeOf = (groupId: string | null | undefined) => groupList.find((item) => item.id === groupId)?.code ?? 'service';
@@ -544,24 +549,10 @@ function CategoriesSection() {
   };
   const saved = (title: string, message: string) => (ok: boolean) => ok && notifications.show({ color: 'teal', title, message });
 
-  /** isTop — категория верхнего уровня: её операции уходят в «Неопределённые», а не к родителю (#18). */
-  const remove = async (category: { id: string; name: string }, isTop: boolean, hasChildren = false) => {
-    const ok = await confirmAction({
-      title: `Удалить «${category.name}»?`,
-      message: (
-        <Text size="sm">
-          {!isTop
-            ? 'Её операции перейдут в родительскую категорию, правила для неё удалятся.'
-            : hasChildren
-              ? 'Подкатегории удалятся вместе с ней, все её операции уйдут в «Неопределённые», правила для неё удалятся.'
-              : 'Её операции уйдут в «Неопределённые», правила для неё удалятся.'}
-        </Text>
-      ),
-      confirmLabel: 'Удалить',
-      danger: true,
-    });
-    if (ok) await run(() => expensesApi.deleteCategory(category.id));
-  };
+  /** Удаление — с выбором, куда перенести операции и правила (по умолчанию: родитель или разбор). */
+  const remove = (category: { id: string; name: string }, isTop: boolean, hasChildren = false, parentId: string | null = null) =>
+    setDeleting({ id: category.id, name: category.name, isTop, hasChildren, parentId });
+  const uncategorizedId = (categories.data ?? []).find((category) => category.system_code === 'uncategorized')?.id ?? null;
 
   // Дерево по группам: обязательные, управляемые, неуправляемые, покупки; служебные и «Доход» — в конце.
   const sections = [
@@ -706,11 +697,20 @@ function CategoriesSection() {
                       )}
                     </Table.Td>
                     <Table.Td>
-                      {!category.system_code && (
-                        <ActionIcon variant="subtle" color="red" onClick={() => remove(category, true, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      )}
+                      <Group gap={2} wrap="nowrap">
+                        {!FIXED.has(category.system_code ?? '') && (
+                          <Tooltip label="Переместить внутрь другой категории">
+                            <ActionIcon variant="subtle" color="gray" onClick={() => setMoving({ id: category.id, name: category.name, isTop: true })} aria-label={`Переместить ${category.name}`}>
+                              <IconArrowsMove size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                        {!category.system_code && (
+                          <ActionIcon variant="subtle" color="red" onClick={() => remove(category, true, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        )}
+                      </Group>
                     </Table.Td>
                   </Table.Tr>,
                   ...category.children.map((child) => (
@@ -721,9 +721,16 @@ function CategoriesSection() {
                       <Table.Td />
                       <Table.Td />
                       <Table.Td>
-                        <ActionIcon variant="subtle" color="red" onClick={() => remove(child, false)} aria-label={`Удалить ${child.name}`}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
+                        <Group gap={2} wrap="nowrap">
+                          <Tooltip label="Переместить в другую категорию">
+                            <ActionIcon variant="subtle" color="gray" onClick={() => setMoving({ id: child.id, name: child.name, isTop: false })} aria-label={`Переместить ${child.name}`}>
+                              <IconArrowsMove size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <ActionIcon variant="subtle" color="red" onClick={() => remove(child, false, false, category.id)} aria-label={`Удалить ${child.name}`}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
                       </Table.Td>
                     </Table.Tr>
                   )),
@@ -733,7 +740,114 @@ function CategoriesSection() {
           </Table>
         </Panel>
       )}
+
+      {deleting && (
+        <DeleteCategoryModal
+          target={deleting}
+          options={categoryOptions(categories.data ?? []).filter(
+            (option) => option.value !== deleting.id && !(categories.data ?? []).find((category) => category.id === deleting.id)?.children.some((child) => child.id === option.value),
+          )}
+          initial={deleting.parentId ?? uncategorizedId}
+          onClose={() => setDeleting(null)}
+          onConfirm={(moveTo) =>
+            void run(() => expensesApi.deleteCategory(deleting.id, moveTo ?? undefined)).then((ok) => {
+              if (ok) {
+                setDeleting(null);
+                saved('Категория удалена', `${deleting.name}: операции и правила перенесены`)(ok);
+              }
+            })
+          }
+        />
+      )}
+      {moving && (
+        <MoveCategoryModal
+          target={moving}
+          options={(categories.data ?? [])
+            .filter((category) => category.id !== moving.id && !FIXED.has(category.system_code ?? '') && category.system_code !== 'income')
+            .map((category) => ({ value: category.id, label: category.name }))}
+          onClose={() => setMoving(null)}
+          onConfirm={(parentId) =>
+            void run(() => expensesApi.updateCategory(moving.id, { parent_id: parentId })).then((ok) => {
+              if (ok) {
+                setMoving(null);
+                saved('Категория перемещена', moving.name)(ok);
+              }
+            })
+          }
+        />
+      )}
     </Stack>
+  );
+}
+
+/** Системные, на которые опирается автоматика: не переносятся внутрь других. */
+const FIXED = new Set(['credit', 'housing', 'income', 'own_transfer', 'savings', 'uncategorized', 'cash']);
+const TOP = '__top__';
+
+function DeleteCategoryModal({
+  target,
+  options,
+  initial,
+  onClose,
+  onConfirm,
+}: {
+  target: { name: string; isTop: boolean; hasChildren: boolean };
+  options: { value: string; label: string }[];
+  initial: string | null;
+  onClose: () => void;
+  onConfirm: (moveTo: string | null) => void;
+}) {
+  const [moveTo, setMoveTo] = useState<string | null>(initial);
+  return (
+    <Modal opened onClose={onClose} title={`Удалить «${target.name}»?`} radius="lg" centered>
+      <Stack gap="sm">
+        <Text size="sm">
+          {target.hasChildren ? 'Подкатегории удалятся вместе с ней. ' : ''}Все её операции и правила перейдут в выбранную категорию — ничего не потеряется.
+        </Text>
+        <Select label="Куда перенести операции и правила" data={options} value={moveTo} onChange={setMoveTo} searchable nothingFoundMessage="Нет такой" radius="md" />
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button color="red" disabled={!moveTo} onClick={() => onConfirm(moveTo)}>
+            Удалить и перенести
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+}
+
+function MoveCategoryModal({
+  target,
+  options,
+  onClose,
+  onConfirm,
+}: {
+  target: { name: string; isTop: boolean };
+  options: { value: string; label: string }[];
+  onClose: () => void;
+  onConfirm: (parentId: string | null) => void;
+}) {
+  const [parent, setParent] = useState<string | null>(null);
+  const data = target.isTop ? options : [{ value: TOP, label: '— сделать категорией верхнего уровня —' }, ...options];
+  return (
+    <Modal opened onClose={onClose} title={`Переместить «${target.name}»`} radius="lg" centered>
+      <Stack gap="sm">
+        <Text size="sm">
+          Операции и правила остаются с ней. Уровней два: у перемещаемой внутрь категории не должно быть своих подкатегорий.
+        </Text>
+        <Select label="Внутрь категории" data={data} value={parent} onChange={setParent} searchable nothingFoundMessage="Нет такой" radius="md" />
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button disabled={!parent} onClick={() => onConfirm(parent === TOP ? null : parent)}>
+            Переместить
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 
