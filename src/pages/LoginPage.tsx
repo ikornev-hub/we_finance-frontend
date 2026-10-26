@@ -1,9 +1,9 @@
-import { Box, Button, Card, Center, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
-import { IconLogin } from '@tabler/icons-react';
-import { useState } from 'react';
+import { Box, Button, Card, Center, Divider, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { IconFlask, IconLogin } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { authApi } from '../api/endpoints';
+import { authApi, serviceApi } from '../api/endpoints';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { setToken } from '../lib/session';
 import { useAction } from '../lib/useAction';
@@ -13,6 +13,21 @@ export function LoginPage() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const submit = useAction<{ token: string }>();
+  const testLogin = useAction<{ token: string }>();
+  // Кнопка тестовой учётки — только на стендах dev и test (их называет /version).
+  const [testStand, setTestStand] = useState(false);
+
+  useEffect(() => {
+    serviceApi
+      .version()
+      .then((version) => setTestStand(version.env === 'dev' || version.env === 'test'))
+      .catch(() => setTestStand(false));
+  }, []);
+
+  const enterTest = async () => {
+    const result = await testLogin.run(() => authApi.testLogin());
+    if (result) setToken(result.token);
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -37,6 +52,15 @@ export function LoginPage() {
             <Button type="submit" leftSection={<IconLogin size={16} />} loading={submit.loading} fullWidth>
               Войти
             </Button>
+            {testStand && (
+              <>
+                <Divider label="стенд для разработки" labelPosition="center" />
+                <Button variant="light" color="gray" leftSection={<IconFlask size={16} />} loading={testLogin.loading} onClick={enterTest} fullWidth>
+                  Войти в тестовую учётку
+                </Button>
+                <ErrorAlert error={testLogin.error} />
+              </>
+            )}
           </Stack>
         </form>
       </Card>

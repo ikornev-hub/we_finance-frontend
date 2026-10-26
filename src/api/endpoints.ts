@@ -27,6 +27,8 @@ const V1 = '/api/v1';
 
 export const authApi = {
   login: (login: string, password: string) => api.post<{ token: string }>(`${V1}/auth/login`, { login, password }),
+  /** Только на стендах dev и test; на stage и prod — 404. */
+  testLogin: () => api.post<{ token: string }>(`${V1}/auth/test-login`),
 };
 
 export const serviceApi = {
