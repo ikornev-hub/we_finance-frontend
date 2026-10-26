@@ -377,6 +377,8 @@ export interface MonthForecast {
   can_spend: Money;
   limits_total: Money;
   unallocated: Money;
+  /** Обязательные по категориям: кредит — по графику, жильё — по правилу (или факт, если больше). */
+  mandatory_by_category: Record<string, Money>;
 }
 
 export interface MonthReport {

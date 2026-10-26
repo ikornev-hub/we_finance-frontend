@@ -140,6 +140,7 @@ export const SAMPLE_MONTH: MonthReport = {
     can_spend: '79376.24',
     limits_total: '24925.00',
     unallocated: '74575.00',
+    mandatory_by_category: {},
   },
   groups: [
     group('g-mandatory', 'mandatory', 'Обязательные', '80500.00', '0.4472'),
