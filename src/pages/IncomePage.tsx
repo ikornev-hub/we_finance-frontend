@@ -23,8 +23,7 @@ import { DateField, IntField, MoneyField } from '../components/fields';
 import { YearOverview } from '../components/income/YearOverview';
 import { ProfileEditor } from '../components/salary/ProfileEditor';
 import { WhatIfView } from '../components/salary/ReportView';
-import { snapshotProfile, withBackup } from '../lib/backup';
-import { confirmAction, notifySaved } from '../lib/confirm';
+import { confirmAction, notifyDone } from '../lib/confirm';
 import { EXAMPLE_PROFILE, EXAMPLE_WHAT_IF, clone } from '../lib/examples';
 import { ABSENCE_KIND, date, signedMoney, todayIso } from '../lib/format';
 import { useAction } from '../lib/useAction';
@@ -148,12 +147,7 @@ function AbsenceForm({ netBefore, onDone }: { netBefore: string | null; onDone: 
   const add = useAction<SalaryProfile>();
 
   const submit = async () => {
-    const saved = await add.run(async () => {
-      const { result } = await withBackup('salary-profile', 'Перед добавлением отсутствия', snapshotProfile, () =>
-        salaryApi.addAbsence(absence),
-      );
-      return result;
-    });
+    const saved = await add.run(() => salaryApi.addAbsence(absence));
     if (saved) onDone(netBefore);
   };
 
@@ -214,17 +208,12 @@ function DataSection() {
     if (!profile) return;
     const ok = await confirmAction({
       title: 'Сохранить данные о доходах?',
-      message: <Text size="sm">Отчёт пересчитается по новым данным. Прежние данные сначала скачаются бэкапом.</Text>,
+      message: <Text size="sm">Данные заменятся целиком тем, что сейчас в форме, и отчёт пересчитается.</Text>,
       confirmLabel: 'Сохранить',
     });
     if (!ok) return;
-    const saved = await save.run(async () => {
-      const { result, backup } = await withBackup('salary-profile', 'Перед сохранением данных о доходах', snapshotProfile, () =>
-        salaryApi.putProfile(profile),
-      );
-      notifySaved('Данные сохранены', backup);
-      return result;
-    });
+    const saved = await save.run(() => salaryApi.putProfile(profile));
+    if (saved) notifyDone('Данные сохранены', 'Отчёт пересчитан по новым данным.');
     if (saved) window.location.hash = '#income/overview';
   };
 
@@ -250,7 +239,7 @@ function DataSection() {
         <Panel>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Пока данные хранятся в файле бэкенда, перед сохранением скачивается их копия.
+              Данные хранятся в базе; копии базы делает сервер.
             </Text>
             <Group gap="sm">
               <Button variant="default" onClick={go('overview')}>

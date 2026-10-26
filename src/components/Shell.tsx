@@ -120,7 +120,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           />
           <Group gap="xs" wrap="nowrap">
             <StatusPill status={status} />
-            <Tooltip label="Система: состояние и бэкапы">
+            <Tooltip label="Система: состояние сервера">
               <ActionIcon
                 variant={route.tab.id === 'system' ? 'light' : 'subtle'}
                 color="gray"

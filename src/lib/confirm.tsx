@@ -3,8 +3,6 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import type { ReactNode } from 'react';
 
-import type { BackupEntry } from './backup';
-
 interface ConfirmOptions {
   title: string;
   message: ReactNode;
@@ -29,19 +27,8 @@ export function confirmAction({ title, message, confirmLabel, danger }: ConfirmO
   });
 }
 
-/** Сообщение после записи: сделан ли бэкап и куда. */
-/** Запись прошла (без бэкапа: данные в базе). */
+/** Запись прошла: короткое уведомление. */
 export function notifyDone(title: string, message: string): void {
   notifications.show({ title, message, color: 'teal', autoClose: 6000 });
 }
 
-export function notifySaved(title: string, backup: BackupEntry | null): void {
-  notifications.show({
-    title,
-    message: backup
-      ? 'Бэкап скачан в «Загрузки» и сохранён во вкладке «Бэкапы».'
-      : 'Бэкап не понадобился: раньше данных не было.',
-    color: 'teal',
-    autoClose: 6000,
-  });
-}
