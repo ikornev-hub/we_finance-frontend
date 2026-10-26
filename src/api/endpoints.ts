@@ -98,6 +98,8 @@ export const expensesApi = {
       uncategorized: query.uncategorized ? 'true' : undefined,
     }),
   similar: (id: string) => api.get<RulePreview>(`${V1}/expenses/operations/${enc(id)}/similar`),
+  setCategories: (operationIds: string[], categoryId: string) =>
+    api.post<{ updated: number }>(`${V1}/expenses/operations/category`, { operation_ids: operationIds, category_id: categoryId }),
   setCategory: (id: string, categoryId: string, remember: boolean) =>
     api.patch<CategoryChange>(`${V1}/expenses/operations/${enc(id)}`, { category_id: categoryId, remember }),
   categories: () => api.get<ExpenseCategory[]>(`${V1}/expenses/categories`),

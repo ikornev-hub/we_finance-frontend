@@ -31,7 +31,7 @@ import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
-import { CategorySelect, MonthSwitch, SampleNotice, monthTitle, useSelectedMonth } from '../components/expenses/common';
+import { CategorySelect, MonthSwitch, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { AnalysisSection } from '../components/expenses/AnalysisSection';
 import { GoalsSection } from '../components/expenses/GoalsSection';
 import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
@@ -211,22 +211,88 @@ function OperationsTable({
   onChanged: () => void;
   withRemember?: boolean;
 }) {
+  // Выбор списком: отметить несколько операций и разом поставить им категорию.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const ids = new Set(operations.map((operation) => operation.id));
+    setSelected((prev) => new Set([...prev].filter((id) => ids.has(id))));
+  }, [operations]);
+  const all = operations.length > 0 && selected.size === operations.length;
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const apply = async () => {
+    if (!bulkCategory || selected.size === 0) return;
+    setBusy(true);
+    try {
+      const result = await expensesApi.setCategories([...selected], bulkCategory);
+      const title = categoryOptions(categories).find((option) => option.value === bulkCategory)?.label ?? '';
+      notifications.show({ color: 'teal', title: `Разложено: ${result.updated}`, message: `→ ${title}` });
+      setSelected(new Set());
+      setBulkCategory(null);
+      onChanged();
+    } catch (error) {
+      notifications.show({ color: 'red', title: 'Не сохранилось', message: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <Table verticalSpacing="sm" highlightOnHover>
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>Дата</Table.Th>
-          <Table.Th>Операция</Table.Th>
-          <Table.Th ta="right">Сумма</Table.Th>
-          <Table.Th>Категория</Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {operations.map((operation) => (
-          <OperationRow key={operation.id} operation={operation} categories={categories} onChanged={onChanged} withRemember={withRemember} />
-        ))}
-      </Table.Tbody>
-    </Table>
+    <Stack gap="sm">
+      {selected.size > 0 && (
+        <Group gap="sm" p="sm" style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--mantine-color-body)', borderRadius: 12, border: '1px solid var(--mantine-color-default-border)' }}>
+          <Text size="sm" fw={600}>
+            Выбрано: {selected.size}
+          </Text>
+          <CategorySelect categories={categories} value={bulkCategory} onChange={setBulkCategory} width={260} />
+          <Button size="sm" disabled={!bulkCategory} loading={busy} onClick={apply}>
+            Поставить категорию
+          </Button>
+          <Button size="sm" variant="subtle" onClick={() => setSelected(new Set())}>
+            Снять выбор
+          </Button>
+        </Group>
+      )}
+      <Table verticalSpacing="sm" highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th w={36}>
+              <Checkbox
+                aria-label="Выбрать все"
+                checked={all}
+                indeterminate={selected.size > 0 && !all}
+                onChange={() => setSelected(all ? new Set() : new Set(operations.map((operation) => operation.id)))}
+              />
+            </Table.Th>
+            <Table.Th>Дата</Table.Th>
+            <Table.Th>Операция</Table.Th>
+            <Table.Th ta="right">Сумма</Table.Th>
+            <Table.Th>Категория</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {operations.map((operation) => (
+            <OperationRow
+              key={operation.id}
+              operation={operation}
+              categories={categories}
+              onChanged={onChanged}
+              withRemember={withRemember}
+              selected={selected.has(operation.id)}
+              onSelect={() => toggle(operation.id)}
+            />
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Stack>
   );
 }
 
@@ -235,11 +301,15 @@ function OperationRow({
   categories,
   onChanged,
   withRemember,
+  selected,
+  onSelect,
 }: {
   operation: ExpenseOperation;
   categories: ExpenseCategory[];
   onChanged: () => void;
   withRemember: boolean;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const [category, setCategory] = useState<string | null>(withRemember ? null : operation.category_id);
   const [remember, setRemember] = useState(withRemember);
@@ -270,7 +340,10 @@ function OperationRow({
   };
 
   return (
-    <Table.Tr>
+    <Table.Tr bg={selected ? 'var(--mantine-color-default-hover)' : undefined}>
+      <Table.Td>
+        <Checkbox aria-label="Выбрать операцию" checked={selected} onChange={onSelect} />
+      </Table.Td>
       <Table.Td w={100}>{date(operation.operated_at)}</Table.Td>
       <Table.Td>
         <Stack gap={2}>
@@ -282,7 +355,7 @@ function OperationRow({
               {who ?? '—'}
             </Text>
           </Group>
-          <Text size="xs" c="dimmed" lineClamp={1}>
+          <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>
             {operation.description}
           </Text>
           {preview && <SimilarList preview={preview} />}
