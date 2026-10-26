@@ -28,11 +28,11 @@ import {
 import { useEffect, useState } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
-import type { AccountKind, ExpenseAccountIn, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
+import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, monthTitle, useSelectedMonth } from '../components/expenses/common';
-import { ForecastPanel, MonthTotals, MonthTree } from '../components/expenses/MonthView';
+import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
   SAMPLE_ACCOUNTS,
@@ -434,15 +434,23 @@ function ImportSection() {
 
 function CategoriesSection() {
   const categories = useCategories();
+  const groups = useOrSample(() => expensesApi.groups(), [] as ExpenseGroup[], 'groups');
   const [name, setName] = useState('');
   const [parent, setParent] = useState<string | null>(null);
+  const [group, setGroup] = useState<string | null>(null);
   const change = useAction<unknown>();
+
+  const groupList = groups.data ?? [];
+  const managed = groupList.find((item) => item.code === 'managed')?.id ?? null;
+  const groupOptions = [...groupList.map((item) => ({ value: item.id, label: item.name })), { value: SERVICE, label: 'Служебные' }];
+  const codeOf = (groupId: string | null | undefined) => groupList.find((item) => item.id === groupId)?.code ?? 'service';
 
   /** true — получилось; при ошибке введённое не стираем (#14). */
   const run = async (call: () => Promise<unknown>): Promise<boolean> => {
     try {
       await call();
       categories.reload();
+      groups.reload();
       return true;
     } catch (error) {
       if (notImplemented(error)) {
@@ -455,6 +463,7 @@ function CategoriesSection() {
       return false;
     }
   };
+  const saved = (title: string, message: string) => (ok: boolean) => ok && notifications.show({ color: 'teal', title, message });
 
   /** isTop — категория верхнего уровня: её операции уходят в «Неопределённые», а не к родителю (#18). */
   const remove = async (category: { id: string; name: string }, isTop: boolean, hasChildren = false) => {
@@ -475,12 +484,59 @@ function CategoriesSection() {
     if (ok) await run(() => expensesApi.deleteCategory(category.id));
   };
 
+  // Дерево по группам: обязательные, управляемые, неуправляемые, покупки; служебные и «Доход» — в конце.
+  const sections = [
+    ...groupList.map((item) => ({ key: item.id, title: item.name, items: (categories.data ?? []).filter((category) => category.group_id === item.id) })),
+    {
+      key: SERVICE,
+      title: 'Служебные и доход',
+      items: (categories.data ?? []).filter((category) => !category.group_id || !groupList.some((item) => item.id === category.group_id)),
+    },
+  ];
+
   return (
     <Stack gap="lg">
-      <PageHeader title="Категории" subtitle="Дерево трат: категории и подкатегории. Есть стартовые — меняй как удобно. Системные не удаляются: на них опирается автоматика." />
+      <PageHeader
+        title="Категории"
+        subtitle="Группы → категории → подкатегории. Обязательные вычитаются из дохода; у остальных групп и их категорий — граница в % располагаемого или суммой."
+      />
       {categories.sample && <SampleNotice what="Категории" />}
       <ErrorAlert error={categories.error} />
       <ErrorAlert error={change.error} />
+
+      {groupList.length > 0 && (
+        <Panel title="Группы" subtitle="Граница группы — на все её категории сразу">
+          <Table verticalSpacing="xs">
+            <Table.Tbody>
+              {groupList.map((item) => (
+                <Table.Tr key={item.id}>
+                  <Table.Td>
+                    <NameInput name={item.name} bold onSave={(next) => run(() => expensesApi.updateGroup(item.id, { name: next }))} />
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" c="dimmed">
+                      {GROUP_HINT[item.code]}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td w={300}>
+                    {item.code === 'mandatory' ? (
+                      <Text size="xs" c="dimmed">
+                        без границы — вычитаются из дохода
+                      </Text>
+                    ) : (
+                      <LimitEditor
+                        category={item}
+                        onSave={(limit, text) => void run(() => expensesApi.updateGroup(item.id, limit)).then(saved('Граница группы сохранена', `${item.name}: ${text}`))}
+                      />
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Panel>
+      )}
+
       <Panel title="Новая категория">
         <Group align="flex-end" gap="sm">
           <TextInput label="Название" value={name} onChange={(event) => setName(event.currentTarget.value)} radius="md" w={220} />
@@ -496,71 +552,103 @@ function CategoriesSection() {
             radius="md"
             w={220}
           />
+          {parent === null && groupList.length > 0 && (
+            <Select label="Группа" data={groupList.map((item) => ({ value: item.id, label: item.name }))} value={group ?? managed} onChange={setGroup} radius="md" w={180} />
+          )}
           <Button
             leftSection={<IconPlus size={16} />}
             disabled={!name.trim()}
-            onClick={() => run(() => expensesApi.createCategory({ name: name.trim(), parent_id: parent })).then((ok) => ok && setName(''))}
+            onClick={() =>
+              run(() => expensesApi.createCategory({ name: name.trim(), parent_id: parent, ...(parent === null ? { group_id: group ?? managed } : {}) })).then(
+                (ok) => ok && setName(''),
+              )
+            }
           >
             Добавить
           </Button>
         </Group>
       </Panel>
+
       {categories.data && (
         <Panel title="Дерево">
           <Table verticalSpacing="xs">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Категория</Table.Th>
+                <Table.Th w={190}>Группа</Table.Th>
                 <Table.Th w={300}>Граница: % располагаемого или сумма</Table.Th>
                 <Table.Th w={60} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {categories.data.map((category) => [
-                <Table.Tr key={category.id}>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <NameInput name={category.name} bold onSave={(next) => run(() => expensesApi.updateCategory(category.id, { name: next }))} />
-                      {category.system_code && (
-                        <Badge size="xs" variant="light" color="gray">
-                          системная
-                        </Badge>
-                      )}
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    {!NO_LIMIT.has(category.system_code ?? '') && (
-                      <LimitEditor
-                        category={category}
-                        onSave={(limit, text) =>
-                          void run(() => expensesApi.updateCategory(category.id, limit)).then(
-                            (ok) => ok && notifications.show({ color: 'teal', title: 'Граница сохранена', message: `${category.name}: ${text}` }),
-                          )
-                        }
-                      />
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    {!category.system_code && (
-                      <ActionIcon variant="subtle" color="red" onClick={() => remove(category, true, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    )}
+              {sections.map((section) => [
+                <Table.Tr key={`section-${section.key}`} style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Table.Td colSpan={4}>
+                    <Text size="sm" fw={700}>
+                      {section.title}
+                    </Text>
                   </Table.Td>
                 </Table.Tr>,
-                ...category.children.map((child) => (
-                  <Table.Tr key={child.id}>
-                    <Table.Td pl={36}>
-                      <NameInput name={child.name} onSave={(next) => run(() => expensesApi.updateCategory(child.id, { name: next }))} />
-                    </Table.Td>
-                    <Table.Td />
+                ...section.items.flatMap((category) => [
+                  <Table.Tr key={category.id}>
                     <Table.Td>
-                      <ActionIcon variant="subtle" color="red" onClick={() => remove(child, false)} aria-label={`Удалить ${child.name}`}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
+                      <Group gap="xs">
+                        <NameInput name={category.name} bold onSave={(next) => run(() => expensesApi.updateCategory(category.id, { name: next }))} />
+                        {category.system_code && (
+                          <Badge size="xs" variant="light" color="gray">
+                            системная
+                          </Badge>
+                        )}
+                      </Group>
                     </Table.Td>
-                  </Table.Tr>
-                )),
+                    <Table.Td>
+                      {category.system_code !== 'income' && groupList.length > 0 && (
+                        <Select
+                          size="xs"
+                          w={170}
+                          data={groupOptions}
+                          value={category.group_id ?? SERVICE}
+                          allowDeselect={false}
+                          onChange={(next) =>
+                            next &&
+                            void run(() => expensesApi.updateCategory(category.id, { group_id: next === SERVICE ? null : next })).then(
+                              saved('Категория перенесена', `${category.name} → ${groupOptions.find((option) => option.value === next)?.label ?? ''}`),
+                            )
+                          }
+                        />
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {LIMITED.has(codeOf(category.group_id)) && (
+                        <LimitEditor
+                          category={category}
+                          onSave={(limit, text) => void run(() => expensesApi.updateCategory(category.id, limit)).then(saved('Граница сохранена', `${category.name}: ${text}`))}
+                        />
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {!category.system_code && (
+                        <ActionIcon variant="subtle" color="red" onClick={() => remove(category, true, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>,
+                  ...category.children.map((child) => (
+                    <Table.Tr key={child.id}>
+                      <Table.Td pl={36}>
+                        <NameInput name={child.name} onSave={(next) => run(() => expensesApi.updateCategory(child.id, { name: next }))} />
+                      </Table.Td>
+                      <Table.Td />
+                      <Table.Td />
+                      <Table.Td>
+                        <ActionIcon variant="subtle" color="red" onClick={() => remove(child, false)} aria-label={`Удалить ${child.name}`}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Table.Td>
+                    </Table.Tr>
+                  )),
+                ]),
               ])}
             </Table.Tbody>
           </Table>
@@ -570,8 +658,11 @@ function CategoriesSection() {
   );
 }
 
-/** Обязательные и доход: границ у них нет (вычитаются из дохода или сами доход). */
-const NO_LIMIT = new Set(['income', 'credit', 'housing']);
+/** Значение «Служебные» в выборе группы (у категории group_id = null). */
+const SERVICE = 'service';
+/** Группы, у которых и у их категорий есть граница. */
+const LIMITED = new Set(['managed', 'unmanaged', 'purchases']);
+
 
 /** Имя категории, которое правится на месте: изменил и ушёл из поля — сохранено. */
 function NameInput({ name, bold = false, onSave }: { name: string; bold?: boolean; onSave: (name: string) => void }) {
@@ -600,7 +691,7 @@ type Limit = { target_share: string | null } | { target_amount: string | null };
  * Граница категории: в % от располагаемого или суммой. Пусто — без границы.
  * Сохраняется по Enter или при уходе из поля; без изменений сервер не дёргаем.
  */
-function LimitEditor({ category, onSave }: { category: ExpenseCategory; onSave: (limit: Limit, text: string) => void }) {
+function LimitEditor({ category, onSave }: { category: { target_share: string | null; target_amount?: string | null }; onSave: (limit: Limit, text: string) => void }) {
   const [mode, setMode] = useState<'share' | 'amount'>(category.target_amount ? 'amount' : 'share');
   const current = mode === 'amount' ? (category.target_amount ? Number(category.target_amount) : undefined) : category.target_share ? Number(category.target_share) * 100 : undefined;
   const save = (raw: string) => {

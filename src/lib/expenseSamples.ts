@@ -6,6 +6,8 @@ import type {
   ExpenseCategory,
   ExpenseOperation,
   IncomeCheck,
+  MonthCategory,
+  MonthGroup,
   MonthReport,
 } from '../api/types';
 
@@ -62,67 +64,89 @@ export const SAMPLE_UNCATEGORIZED: ExpenseOperation[] = [
   },
 ];
 
-// Эталон месяца из analysts/requirements/fixtures/README.md (без плана: прогноз = факт).
+// Эталон групп из analysts/requirements/fixtures/README.md (без плана: прогноз = факт).
+const cat = (
+  id: string,
+  name: string,
+  group_code: MonthCategory['group_code'],
+  amount: string,
+  share: string | null,
+  children: MonthCategory['children'] = [],
+  limit: Partial<MonthCategory> = {},
+): MonthCategory => ({
+  id,
+  name,
+  system_code: null,
+  group_code,
+  amount,
+  share,
+  limit_mode: null,
+  target_share: null,
+  target: null,
+  deviation: null,
+  remaining: null,
+  children,
+  ...limit,
+});
+
+const SAMPLE_CATS: MonthCategory[] = [
+  cat('c-credit', 'Кредит', 'mandatory', '50000.00', null, [], { system_code: 'credit' }),
+  cat('c-home', 'Жильё', 'mandatory', '30000.00', null, [{ id: 'c-home-rent', name: 'Аренда', amount: '30000.00', share: null }], { system_code: 'housing' }),
+  cat('c-phone', 'Связь', 'mandatory', '500.00', null, [{ id: 'c-phone-mobile', name: 'Мобильная', amount: '500.00', share: null }]),
+  cat('c-car', 'Машина', 'managed', '4150.00', '0.0417', [
+    { id: 'c-car-fuel', name: 'Бензин', amount: '4000.00', share: '0.0402' },
+    { id: 'c-car-wash', name: 'Мойка', amount: '150.00', share: '0.0015' },
+  ], { limit_mode: 'amount', target_share: '0.1005', target: '10000.00', deviation: '-5850.00', remaining: '5850.00' }),
+  cat('c-food', 'Еда', 'managed', '2133.56', '0.0214', [
+    { id: 'c-food-groceries', name: 'Продукты', amount: '1234.56', share: '0.0124' },
+    { id: 'c-food-alcohol', name: 'Алкоголь', amount: '899.00', share: '0.0090' },
+  ], { limit_mode: 'share', target_share: '0.15', target: '14925.00', deviation: '-12791.44', remaining: '12791.44' }),
+  cat('c-tax', 'Налоги и штрафы', 'unmanaged', '562.50', '0.0057', [{ id: 'c-tax-fines', name: 'Штрафы', amount: '562.50', share: '0.0057' }]),
+  cat('c-none', 'Неопределённые', 'service', '10777.70', '0.1083', [], { system_code: 'uncategorized' }),
+  cat('c-own', 'Переводы себе', 'service', '2500.00', '0.0251', [], { system_code: 'own_transfer' }),
+];
+
+const group = (id: string | null, code: MonthGroup['code'], name: string, amount: string, share: string): MonthGroup => ({
+  id,
+  code,
+  name,
+  amount,
+  share,
+  limit_mode: null,
+  target_share: null,
+  target: null,
+  deviation: null,
+  remaining: null,
+  categories: SAMPLE_CATS.filter((category) => category.group_code === code),
+});
+
 export const SAMPLE_MONTH: MonthReport = {
   month: '2026-10',
   income: '180000.00',
   expenses: '100623.76',
   balance: '79376.24',
-  disposable: '100000.00',
+  disposable: '99500.00',
   uncategorized_count: 4,
   has_statement: true,
   closed: true,
   warnings: [],
   forecast: {
     income: '180000.00',
-    credit: '50000.00',
-    housing: '30000.00',
-    disposable: '100000.00',
-    spent: '20623.76',
+    mandatory: '80500.00',
+    disposable: '99500.00',
+    spent: '20123.76',
     can_spend: '79376.24',
-    limits_total: '25000.00',
-    unallocated: '75000.00',
+    limits_total: '24925.00',
+    unallocated: '74575.00',
   },
-  categories: [
-    { id: 'c-credit', name: 'Кредит', system_code: 'credit', amount: '50000.00', share: null, limit_mode: null, target_share: null, target: null, deviation: null, remaining: null, children: [] },
-    { id: 'c-home', name: 'Жильё', system_code: 'housing', amount: '30000.00', share: null, limit_mode: null, target_share: null, target: null, deviation: null, remaining: null, children: [{ id: 'c-home-rent', name: 'Аренда', amount: '30000.00', share: null }] },
-    { id: 'c-none', name: 'Неопределённые', system_code: 'uncategorized', amount: '10777.70', share: '0.1078', limit_mode: null, target_share: null, target: null, deviation: null, remaining: null, children: [] },
-    {
-      id: 'c-car',
-      name: 'Машина',
-      system_code: null,
-      amount: '4712.50',
-      share: '0.0471',
-      limit_mode: 'amount',
-      target_share: '0.1000',
-      target: '10000.00',
-      deviation: '-5287.50',
-      remaining: '5287.50',
-      children: [
-        { id: 'c-car-fuel', name: 'Бензин', amount: '4000.00', share: '0.0400' },
-        { id: 'c-car-fines', name: 'Штрафы', amount: '562.50', share: '0.0056' },
-        { id: 'c-car-wash', name: 'Мойка', amount: '150.00', share: '0.0015' },
-      ],
-    },
-    { id: 'c-own', name: 'Переводы себе', system_code: 'own_transfer', amount: '2500.00', share: '0.0250', limit_mode: null, target_share: null, target: null, deviation: null, remaining: null, children: [] },
-    {
-      id: 'c-food',
-      name: 'Еда',
-      system_code: null,
-      amount: '2133.56',
-      share: '0.0213',
-      limit_mode: 'share',
-      target_share: '0.15',
-      target: '15000.00',
-      deviation: '-12866.44',
-      remaining: '12866.44',
-      children: [
-        { id: 'c-food-groceries', name: 'Продукты', amount: '1234.56', share: '0.0123' },
-        { id: 'c-food-alcohol', name: 'Алкоголь', amount: '899.00', share: '0.0090' },
-      ],
-    },
-    { id: 'c-phone', name: 'Связь', system_code: null, amount: '500.00', share: '0.0050', limit_mode: null, target_share: null, target: null, deviation: null, remaining: null, children: [{ id: 'c-phone-mobile', name: 'Мобильная', amount: '500.00', share: '0.0050' }] },
+  groups: [
+    group('g-mandatory', 'mandatory', 'Обязательные', '80500.00', '0.4472'),
+    group('g-managed', 'managed', 'Управляемые', '6283.56', '0.0632'),
+    group('g-unmanaged', 'unmanaged', 'Неуправляемые', '562.50', '0.0057'),
+    group('g-purchases', 'purchases', 'Покупки', '0.00', '0.0000'),
+    group(null, 'service', 'Служебные', '13277.70', '0.1334'),
   ],
+  categories: SAMPLE_CATS,
 };
 
 export const SAMPLE_ACCOUNTS: ExpenseAccount[] = [

@@ -11,6 +11,8 @@ import type {
   ImportResult,
   IncomeCheck,
   MonthReport,
+  ExpenseGroup,
+  GroupPatch,
   RulePreview,
   Absence,
   CalculationIn,
@@ -95,6 +97,8 @@ export const expensesApi = {
   setCategory: (id: string, categoryId: string, remember: boolean) =>
     api.patch<CategoryChange>(`${V1}/expenses/operations/${enc(id)}`, { category_id: categoryId, remember }),
   categories: () => api.get<ExpenseCategory[]>(`${V1}/expenses/categories`),
+  groups: () => api.get<ExpenseGroup[]>(`${V1}/expenses/groups`),
+  updateGroup: (id: string, patch: GroupPatch) => api.patch<ExpenseGroup>(`${V1}/expenses/groups/${enc(id)}`, patch),
   createCategory: (category: CategoryIn) => api.post<ExpenseCategory>(`${V1}/expenses/categories`, category),
   updateCategory: (id: string, patch: Partial<CategoryIn>) =>
     api.patch<ExpenseCategory>(`${V1}/expenses/categories/${enc(id)}`, patch),

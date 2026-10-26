@@ -7,7 +7,7 @@ import type { IncomeCheck, LoanDetailOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CHECK_BADGE, MonthSwitch, SampleNotice, monthTitle, percent, useSelectedMonth } from '../components/expenses/common';
-import { MonthTotals, RemainingBadge, limitLabel } from '../components/expenses/MonthView';
+import { MonthTotals, RemainingBadge, fill, limitLabel } from '../components/expenses/MonthView';
 import { SAMPLE_INCOME_CHECK, SAMPLE_MONTH } from '../lib/expenseSamples';
 import { PAYMENT_KIND, date, money, todayIso } from '../lib/format';
 import { useOrSample } from '../lib/sample';
@@ -64,8 +64,8 @@ export function HomePage() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
-  const categories = (report.data?.categories ?? []).filter((category) => Number(category.amount) !== 0);
-  const max = Math.max(...categories.map((category) => Number(category.amount)), 1);
+  const groups = (report.data?.groups ?? []).filter((group) => Number(group.amount) !== 0 || group.limit_mode);
+  const max = Math.max(...groups.map((group) => Number(group.amount)), 1);
 
   return (
     <Stack gap="lg">
@@ -91,43 +91,50 @@ export function HomePage() {
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
         <Panel
-          title="Категории"
-          subtitle="Факт, доля от располагаемого, граница и сколько ещё можно"
+          title="Группы трат"
+          subtitle="Факт, доля, граница и сколько ещё можно; внутри — крупнейшие категории"
           actions={
             <Button variant="subtle" size="xs" rightSection={<IconArrowRight size={14} />} onClick={() => (window.location.hash = '#expenses/month')}>
               Подробно
             </Button>
           }
         >
-          <Stack gap="sm">
-            {categories.length === 0 && (
+          <Stack gap="md">
+            {groups.length === 0 && (
               <Text size="sm" c="dimmed">
                 Трат за месяц нет — загрузи выписку.
               </Text>
             )}
-            {categories.map((category) => {
-              const over = category.remaining !== null && Number(category.remaining) < 0;
-              const fill = category.target ? (Number(category.amount) / Number(category.target)) * 100 : (Number(category.amount) / max) * 100;
+            {groups.map((group) => {
+              const over = group.remaining !== null && Number(group.remaining) < 0;
+              const top = group.categories.filter((category) => Number(category.amount) > 0).slice(0, 3);
               return (
-                <Stack key={category.id} gap={4}>
+                <Stack key={group.code} gap={4}>
                   <Group justify="space-between" wrap="nowrap">
-                    <Text size="sm" fw={600}>
-                      {category.name}
+                    <Text size="sm" fw={700}>
+                      {group.name}
                     </Text>
                     <Group gap="xs" wrap="nowrap">
-                      <Text size="sm">{money(category.amount)}</Text>
+                      <Text size="sm" fw={600} style={{ whiteSpace: 'nowrap' }}>
+                        {money(group.amount)}
+                      </Text>
                       <Text size="xs" c="dimmed" w={56} ta="right">
-                        {percent(category.share)}
+                        {percent(group.share)}
                       </Text>
                     </Group>
                   </Group>
-                  <Progress value={Math.min(fill, 100)} size="sm" color={over ? 'red' : category.target ? 'teal' : 'brand'} />
-                  {category.limit_mode && (
+                  <Progress value={fill(group, max)} size="sm" color={over ? 'red' : group.target ? 'teal' : group.code === 'mandatory' ? 'gray' : 'brand'} />
+                  {top.length > 0 && (
+                    <Text size="xs" c="dimmed" lineClamp={1}>
+                      {top.map((category) => `${category.name} ${money(category.amount)}`).join(' · ')}
+                    </Text>
+                  )}
+                  {group.limit_mode && (
                     <Group justify="space-between" wrap="nowrap">
                       <Text size="xs" c="dimmed">
-                        граница {limitLabel(category)}
+                        граница {limitLabel(group)}
                       </Text>
-                      <RemainingBadge category={category} />
+                      <RemainingBadge category={group} />
                     </Group>
                   )}
                 </Stack>

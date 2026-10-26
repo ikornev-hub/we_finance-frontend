@@ -280,6 +280,8 @@ export interface ExpenseCategory {
   name: string;
   /** У подкатегории — id родителя; в дереве у верхнего уровня всегда null. */
   parent_id?: string | null;
+  /** Группа (у верхнего уровня); null — «Служебные». */
+  group_id?: string | null;
   system_code: string | null;
   /** Граница — либо доля располагаемого, либо сумма; другое поле null. */
   target_share: string | null;
@@ -290,6 +292,25 @@ export interface ExpenseCategory {
 export interface CategoryIn {
   name: string;
   parent_id?: string | null;
+  group_id?: string | null;
+  target_share?: string | null;
+  target_amount?: Money | null;
+}
+
+export type GroupCode = 'mandatory' | 'managed' | 'unmanaged' | 'purchases' | 'service';
+
+/** Группа трат: обязательные, управляемые, неуправляемые, покупки. */
+export interface ExpenseGroup {
+  id: string;
+  code: Exclude<GroupCode, 'service'>;
+  name: string;
+  target_share: string | null;
+  target_amount: Money | null;
+  category_ids: string[];
+}
+
+export interface GroupPatch {
+  name?: string;
   target_share?: string | null;
   target_amount?: Money | null;
 }
@@ -312,6 +333,7 @@ export interface MonthCategory {
   id: string;
   name: string;
   system_code: string | null;
+  group_code: GroupCode;
   amount: Money;
   share: string | null;
   /** Как задана граница: долей или суммой. */
@@ -325,11 +347,27 @@ export interface MonthCategory {
   children: { id: string; name: string; amount: Money; share: string | null }[];
 }
 
+/** Группа месяца: сумма её категорий, доля, граница и сами категории. */
+export interface MonthGroup {
+  id: string | null;
+  code: GroupCode;
+  name: string;
+  amount: Money;
+  /** У «Обязательных» — от дохода, у остальных — от располагаемого. */
+  share: string | null;
+  limit_mode: 'share' | 'amount' | null;
+  target_share: string | null;
+  target: Money | null;
+  deviation: Money | null;
+  remaining: Money | null;
+  categories: MonthCategory[];
+}
+
 /** Прогноз «план + факт»: от него доли и границы. */
 export interface MonthForecast {
   income: Money;
-  credit: Money;
-  housing: Money;
+  /** Кредит, жильё, связь, близкие… — вычитаются из дохода. */
+  mandatory: Money;
   disposable: Money;
   spent: Money;
   can_spend: Money;
@@ -349,6 +387,7 @@ export interface MonthReport {
   closed: boolean;
   warnings: string[];
   forecast: MonthForecast;
+  groups: MonthGroup[];
   categories: MonthCategory[];
 }
 

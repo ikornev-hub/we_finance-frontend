@@ -1,11 +1,14 @@
 import { Badge, Group, Progress, SimpleGrid, Stack, Table, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconArrowDownRight, IconArrowUpRight, IconChevronDown, IconChevronRight, IconScale, IconWallet } from '@tabler/icons-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
-import type { MonthCategory, MonthReport } from '../../api/types';
+import type { MonthCategory, MonthGroup, MonthReport } from '../../api/types';
 import { money } from '../../lib/format';
 import { HeroCard, Panel, StatCard } from '../Cards';
 import { percent } from './common';
+
+/** Что показывает граница и остаток: у группы и у категории одинаковые поля. */
+type Limited = Pick<MonthCategory, 'limit_mode' | 'target_share' | 'target' | 'remaining'>;
 
 /** Итоги месяца: сколько ещё можно потратить (прогноз), доходы, расходы, остаток по факту. */
 export function MonthTotals({ report }: { report: MonthReport }) {
@@ -23,7 +26,7 @@ export function MonthTotals({ report }: { report: MonthReport }) {
         label="Расходы"
         value={money(report.expenses)}
         icon={<IconArrowUpRight size={16} />}
-        badge={overspent ? { text: 'больше располагаемого', color: 'red' } : { text: 'с кредитом и жильём', color: 'gray' }}
+        badge={overspent ? { text: 'больше располагаемого', color: 'red' } : { text: 'все группы', color: 'gray' }}
       />
       <StatCard label="Остаток месяца" value={money(report.balance)} icon={<IconScale size={16} />} hint="доходы − расходы по выписке" />
     </SimpleGrid>
@@ -33,12 +36,13 @@ export function MonthTotals({ report }: { report: MonthReport }) {
 /** Прогноз «план + факт»: откуда взялся располагаемый и сколько из него распределено границами. */
 export function ForecastPanel({ report }: { report: MonthReport }) {
   const f = report.forecast;
+  const mandatory = report.groups.find((group) => group.code === 'mandatory');
+  const names = mandatory?.categories.map((category) => category.name.toLowerCase()).join(', ') ?? '';
   const rows: [string, string, string][] = [
-    ['Доход', money(f.income), 'больше из: расчёт «Доходов» и факт по выписке'],
-    ['− Кредит', money(f.credit), 'больше из: график «Кредитов» и переводы в кредит'],
-    ['− Жильё', money(f.housing), 'больше из: правило аренды и факт'],
+    ['Доход', money(f.income), report.closed ? 'по выписке' : 'больше из: расчёт «Доходов» и факт по выписке'],
+    ['− Обязательные', money(f.mandatory), names],
     ['= Располагаемый', money(f.disposable), 'от него доли и границы'],
-    ['Потрачено', money(f.spent), 'всё, кроме кредита и жилья'],
+    ['Потрачено', money(f.spent), 'всё, кроме обязательных'],
     ['Границами распределено', money(f.limits_total), `не распределено ${money(f.unallocated)}`],
   ];
   return (
@@ -60,7 +64,7 @@ export function ForecastPanel({ report }: { report: MonthReport }) {
                   {label}
                 </Text>
               </Table.Td>
-              <Table.Td ta="right">
+              <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
                 <Text size="sm" fw={label.startsWith('=') ? 700 : 500}>
                   {value}
                 </Text>
@@ -78,14 +82,14 @@ export function ForecastPanel({ report }: { report: MonthReport }) {
   );
 }
 
-/** «12,3 % · граница 15 % (15 000 ₽)» — граница в той форме, в какой задана, и вторая в скобках. */
-export function limitLabel(category: MonthCategory): string {
-  if (category.target === null && category.limit_mode === null) return '—';
-  if (category.limit_mode === 'amount') return `${money(category.target)} (${percent(category.target_share)})`;
-  return `${percent(category.target_share)}${category.target ? ` (${money(category.target)})` : ''}`;
+/** «15 % (14 925 ₽)» — граница в той форме, в какой задана, и вторая в скобках. */
+export function limitLabel(item: Limited): string {
+  if (item.target === null && item.limit_mode === null) return '—';
+  if (item.limit_mode === 'amount') return `${money(item.target)} (${percent(item.target_share)})`;
+  return `${percent(item.target_share)}${item.target ? ` (${money(item.target)})` : ''}`;
 }
 
-export function RemainingBadge({ category }: { category: MonthCategory }) {
+export function RemainingBadge({ category }: { category: Limited }) {
   if (category.remaining === null) return <>—</>;
   const over = Number(category.remaining) < 0;
   return (
@@ -97,24 +101,39 @@ export function RemainingBadge({ category }: { category: MonthCategory }) {
   );
 }
 
-/** Дерево категорий месяца: факт ₽ и %, граница, сколько ещё можно. Клик по строке — её операции. */
+/** Заполнение полоски: от границы, если она есть, иначе от самой большой суммы рядом. */
+export function fill(item: Limited & { amount: string }, max: number): number {
+  const value = item.target ? (Number(item.amount) / Number(item.target)) * 100 : (Number(item.amount) / max) * 100;
+  return Math.min(value, 100);
+}
+
+export const GROUP_HINT: Record<MonthGroup['code'], string> = {
+  mandatory: 'вычитаются из дохода; доля — от дохода',
+  managed: 'сколько тратить, решаешь сам',
+  unmanaged: 'случаются, планировать трудно',
+  purchases: 'вещи и разовые покупки',
+  service: 'не статья трат: перекладывание и ещё не разобранное',
+};
+
+/** Группы → категории → подкатегории: факт ₽ и %, граница, сколько ещё можно. Клик по категории — её операции. */
 export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (categoryId: string, title: string) => void }) {
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const toggle = (id: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggle = (set: Set<string>, id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  };
   const max = Math.max(...report.categories.map((category) => Number(category.amount)), 1);
+  const groupMax = Math.max(...report.groups.map((group) => Number(group.amount)), 1);
 
   return (
-    <Panel title="Куда ушли деньги" subtitle="Факт и доля от располагаемого, рядом — граница и сколько ещё можно. Нажми на категорию — подкатегории; на подкатегорию — операции">
+    <Panel title="Куда ушли деньги" subtitle="Группы → категории → подкатегории. Нажми на группу — свернуть; на категорию — подкатегории; на подкатегорию — операции">
       <Table verticalSpacing="xs" highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Категория</Table.Th>
+            <Table.Th>Группа / категория</Table.Th>
             <Table.Th ta="right">Факт</Table.Th>
             <Table.Th ta="right">Доля</Table.Th>
             <Table.Th ta="right">Граница</Table.Th>
@@ -122,69 +141,127 @@ export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (c
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {report.categories.map((category) => {
-            const expanded = open.has(category.id);
-            const over = category.remaining !== null && Number(category.remaining) < 0;
-            const required = category.system_code === 'credit' || category.system_code === 'housing';
-            const fill = category.target ? (Number(category.amount) / Number(category.target)) * 100 : (Number(category.amount) / max) * 100;
-            return [
-              <Table.Tr key={category.id} style={{ cursor: 'pointer' }} onClick={() => (category.children.length ? toggle(category.id) : onPick?.(category.id, category.name))}>
-                <Table.Td>
-                  <Group gap={6} wrap="nowrap">
-                    {category.children.length > 0 ? expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} /> : <span style={{ width: 14 }} />}
-                    <Stack gap={2} w="100%">
-                      <Group gap="xs">
-                        <Text size="sm" fw={600}>
-                          {category.name}
-                        </Text>
-                        {required && (
-                          <Badge size="xs" color="gray" variant="light">
-                            обязательное
-                          </Badge>
-                        )}
-                        {category.system_code === 'uncategorized' && Number(category.amount) !== 0 && (
-                          <Badge size="xs" color="orange" variant="light">
-                            разобрать
-                          </Badge>
-                        )}
-                      </Group>
-                      <Progress value={Math.min(fill, 100)} size="xs" color={over ? 'red' : category.target ? 'teal' : 'brand'} />
-                    </Stack>
-                  </Group>
-                </Table.Td>
-                <Table.Td ta="right" fw={600}>
-                  {money(category.amount)}
-                </Table.Td>
-                <Table.Td ta="right">{percent(category.share)}</Table.Td>
-                <Table.Td ta="right" c="dimmed">
-                  {limitLabel(category)}
-                </Table.Td>
-                <Table.Td ta="right">
-                  <RemainingBadge category={category} />
-                </Table.Td>
-              </Table.Tr>,
-              ...(expanded
-                ? category.children.map((child) => (
-                    <Table.Tr key={child.id} style={{ cursor: 'pointer' }} onClick={() => onPick?.(child.id, `${category.name} / ${child.name}`)}>
-                      <Table.Td pl={40}>
-                        <Text size="sm">{child.name}</Text>
-                      </Table.Td>
-                      <Table.Td ta="right">{money(child.amount)}</Table.Td>
-                      <Table.Td ta="right">{percent(child.share)}</Table.Td>
-                      <Table.Td />
-                      <Table.Td />
-                    </Table.Tr>
-                  ))
-                : []),
-            ];
+          {report.groups.map((group) => {
+            const groupKey = group.code;
+            const groupOpen = !closedGroups.has(groupKey);
+            const groupOver = group.remaining !== null && Number(group.remaining) < 0;
+            return (
+              <Fragment key={groupKey}>
+                <Table.Tr style={{ cursor: 'pointer', background: 'var(--mantine-color-default-hover)' }} onClick={() => setClosedGroups((prev) => toggle(prev, groupKey))}>
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      {groupOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                      <Stack gap={2} w="100%">
+                        <Group gap="xs">
+                          <Text size="sm" fw={700}>
+                            {group.name}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {GROUP_HINT[group.code]}
+                          </Text>
+                        </Group>
+                        <Progress value={fill(group, groupMax)} size="xs" color={groupOver ? 'red' : group.target ? 'teal' : 'gray'} />
+                      </Stack>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td ta="right" fw={700} style={{ whiteSpace: 'nowrap' }}>
+                    {money(group.amount)}
+                  </Table.Td>
+                  <Table.Td ta="right" fw={600}>
+                    {percent(group.share)}
+                  </Table.Td>
+                  <Table.Td ta="right" c="dimmed">
+                    {limitLabel(group)}
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    <RemainingBadge category={group} />
+                  </Table.Td>
+                </Table.Tr>
+                {groupOpen &&
+                  group.categories.map((category) => (
+                    <CategoryRows
+                      key={category.id}
+                      category={category}
+                      max={max}
+                      expanded={open.has(category.id)}
+                      onToggle={() => setOpen((prev) => toggle(prev, category.id))}
+                      onPick={onPick}
+                    />
+                  ))}
+              </Fragment>
+            );
           })}
         </Table.Tbody>
       </Table>
       <UnstyledButton mt="sm" onClick={() => setOpen(new Set(report.categories.map((category) => category.id)))}>
         <Text size="xs" c="dimmed">
-          Раскрыть все
+          Раскрыть все категории
         </Text>
       </UnstyledButton>
     </Panel>
+  );
+}
+
+function CategoryRows({
+  category,
+  max,
+  expanded,
+  onToggle,
+  onPick,
+}: {
+  category: MonthCategory;
+  max: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onPick?: (categoryId: string, title: string) => void;
+}) {
+  const over = category.remaining !== null && Number(category.remaining) < 0;
+  return (
+    <>
+      <Table.Tr style={{ cursor: 'pointer' }} onClick={() => (category.children.length ? onToggle() : onPick?.(category.id, category.name))}>
+        <Table.Td pl={28}>
+          <Group gap={6} wrap="nowrap">
+            {category.children.length > 0 ? expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} /> : <span style={{ width: 14 }} />}
+            <Stack gap={2} w="100%">
+              <Group gap="xs">
+                <Text size="sm" fw={600}>
+                  {category.name}
+                </Text>
+                {category.system_code === 'uncategorized' && Number(category.amount) !== 0 && (
+                  <Badge size="xs" color="orange" variant="light">
+                    разобрать
+                  </Badge>
+                )}
+              </Group>
+              <Progress value={fill(category, max)} size="xs" color={over ? 'red' : category.target ? 'teal' : 'brand'} />
+            </Stack>
+          </Group>
+        </Table.Td>
+        <Table.Td ta="right" fw={600} style={{ whiteSpace: 'nowrap' }}>
+          {money(category.amount)}
+        </Table.Td>
+        <Table.Td ta="right">{percent(category.share)}</Table.Td>
+        <Table.Td ta="right" c="dimmed">
+          {limitLabel(category)}
+        </Table.Td>
+        <Table.Td ta="right">
+          <RemainingBadge category={category} />
+        </Table.Td>
+      </Table.Tr>
+      {expanded &&
+        category.children.map((child) => (
+          <Table.Tr key={child.id} style={{ cursor: 'pointer' }} onClick={() => onPick?.(child.id, `${category.name} / ${child.name}`)}>
+            <Table.Td pl={64}>
+              <Text size="sm">{child.name}</Text>
+            </Table.Td>
+            <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
+              {money(child.amount)}
+            </Table.Td>
+            <Table.Td ta="right">{percent(child.share)}</Table.Td>
+            <Table.Td />
+            <Table.Td />
+          </Table.Tr>
+        ))}
+    </>
   );
 }
