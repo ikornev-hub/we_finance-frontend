@@ -6,7 +6,7 @@ import { expensesApi, loansApi, salaryApi } from '../api/endpoints';
 import type { IncomeCheck, LoanDetailOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { CHECK_BADGE, MonthSwitch, SampleNotice, currentMonth, monthTitle, percent } from '../components/expenses/common';
+import { CHECK_BADGE, MonthSwitch, SampleNotice, monthTitle, percent, useSelectedMonth } from '../components/expenses/common';
 import { MonthTotals, RemainingBadge, limitLabel } from '../components/expenses/MonthView';
 import { SAMPLE_INCOME_CHECK, SAMPLE_MONTH } from '../lib/expenseSamples';
 import { PAYMENT_KIND, date, money, todayIso } from '../lib/format';
@@ -36,7 +36,7 @@ function useLoad<T>(fn: () => Promise<T>): { data: T | null; error: unknown } {
  */
 export function HomePage() {
   const today = todayIso();
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useSelectedMonth();
   const year = Number(month.slice(0, 4));
 
   const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);

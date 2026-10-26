@@ -1,5 +1,6 @@
 import { Alert, Button, Group, Select, Text } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight, IconFlask } from '@tabler/icons-react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { ExpenseCategory, IncomeCheckStatus } from '../../api/types';
 
@@ -33,16 +34,26 @@ export function CategorySelect({
   onChange: (value: string | null) => void;
   width?: number;
 }) {
+  const options = categoryOptions(categories);
+  const label = options.find((option) => option.value === value)?.label ?? '';
+  // Поиск при открытии — с чистого листа, а не дописыванием к текущей категории (#19).
+  const [search, setSearch] = useState(label);
+  useEffect(() => setSearch(label), [label]);
   return (
     <Select
-      data={categoryOptions(categories)}
+      data={options}
       value={value}
       onChange={onChange}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onDropdownOpen={() => setSearch('')}
+      onDropdownClose={() => setSearch(label)}
       placeholder="Категория"
       searchable
       radius="md"
       w={width}
       nothingFoundMessage="Нет такой"
+      comboboxProps={{ keepMounted: false }}
     />
   );
 }
@@ -56,6 +67,33 @@ const MONTH_NAMES = [
 export function monthTitle(month: string): string {
   const [year, number] = month.split('-').map(Number);
   return `${MONTH_NAMES[number - 1]} ${year}`;
+}
+
+const MONTH_KEY = 'wf.month';
+let selectedMonth: string | null = null;
+
+function storedMonth(): string | null {
+  try {
+    const value = sessionStorage.getItem(MONTH_KEY);
+    return value && /^\d{4}-\d{2}$/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Выбранный месяц — общий для «Главной», «Месяца» и «Разбора», переживает переходы и F5 (#11). */
+export function useSelectedMonth(): [string, (month: string) => void] {
+  const [month, setMonthState] = useState<string>(() => selectedMonth ?? storedMonth() ?? currentMonth());
+  const setMonth = useCallback((next: string) => {
+    selectedMonth = next;
+    try {
+      sessionStorage.setItem(MONTH_KEY, next);
+    } catch {
+      // без хранилища месяц живёт до перезагрузки
+    }
+    setMonthState(next);
+  }, []);
+  return [month, setMonth];
 }
 
 export function currentMonth(): string {

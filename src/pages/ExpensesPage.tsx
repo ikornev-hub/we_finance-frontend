@@ -31,7 +31,7 @@ import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { CategorySelect, MonthSwitch, SampleNotice, currentMonth, monthTitle } from '../components/expenses/common';
+import { CategorySelect, MonthSwitch, SampleNotice, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { ForecastPanel, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
@@ -81,7 +81,7 @@ function useCategories() {
 // ---------- месяц ----------
 
 function MonthSection() {
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useSelectedMonth();
   const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
   const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);
 
@@ -149,20 +149,40 @@ function CategoryOperations({ month, categoryId, title, onChanged }: { month: st
 // ---------- разобрать неопределённые ----------
 
 function ReviewSection() {
-  const operations = useOrSample(() => expensesApi.operations({ uncategorized: true }), SAMPLE_UNCATEGORIZED, 'uncategorized');
+  const [month, setMonth] = useSelectedMonth();
+  // По умолчанию — выбранный месяц, как в баннере «Ждут разбора: N» (#10).
+  const [scope, setScope] = useState<'month' | 'all'>('month');
+  const operations = useOrSample(
+    () => expensesApi.operations(scope === 'month' ? { uncategorized: true, month } : { uncategorized: true }),
+    SAMPLE_UNCATEGORIZED,
+    `uncategorized/${scope}/${month}`,
+  );
   const categories = useCategories();
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Без категории"
-        subtitle="Выбери категорию. «Запомнить» — система создаст правило для этого получателя или мерчанта, и в следующий раз разложит сама."
-      />
+      <Group justify="space-between" align="flex-start">
+        <PageHeader
+          title="Без категории"
+          subtitle="Выбери категорию. «Запомнить» — система создаст правило для этого получателя или мерчанта, и в следующий раз разложит сама."
+        />
+        <Group gap="sm">
+          <SegmentedControl
+            value={scope}
+            onChange={(next) => setScope(next as 'month' | 'all')}
+            data={[
+              { value: 'month', label: monthTitle(month) },
+              { value: 'all', label: 'Все месяцы' },
+            ]}
+          />
+          {scope === 'month' && <MonthSwitch month={month} onChange={setMonth} />}
+        </Group>
+      </Group>
       {operations.sample && <SampleNotice what="Операции без категории" />}
       <ErrorAlert error={operations.error} />
       {operations.data && operations.data.length === 0 && (
         <Alert color="teal" radius="lg" variant="light" icon={<IconCheck size={18} />} title="Всё разобрано">
-          <Text size="sm">Операций без категории нет.</Text>
+          <Text size="sm">{scope === 'month' ? `В ${monthTitle(month).toLowerCase()} операций без категории нет.` : 'Операций без категории нет.'}</Text>
         </Alert>
       )}
       {operations.data && operations.data.length > 0 && categories.data && (
@@ -219,7 +239,8 @@ function OperationRow({
   const [remember, setRemember] = useState(withRemember);
   const save = useAction<unknown>();
   const who = operation.counterparty ?? operation.merchant;
-  const preview = useRulePreview(operation.id, withRemember && remember && Boolean(who));
+  // Предпросмотр — только когда выбрана категория: иначе запрос на каждую строку при открытии (#12).
+  const preview = useRulePreview(operation.id, withRemember && remember && Boolean(who) && category !== null);
 
   const submit = async () => {
     if (!category) return;
@@ -335,6 +356,19 @@ function ImportSection() {
   const [bank, setBank] = useState('alfa');
   const [file, setFile] = useState<File | null>(null);
   const upload = useAction<ImportResult>();
+  const [waiting, setWaiting] = useState<number | null>(null);
+
+  const send = async (chosen: File) => {
+    setWaiting(null);
+    const result = await upload.run(() => expensesApi.importStatement(bank, chosen));
+    if (result) {
+      // Всего ждут разбора — не только новые из этого файла (#20).
+      expensesApi
+        .operations({ uncategorized: true })
+        .then((list) => setWaiting(list.length))
+        .catch(() => setWaiting(null));
+    }
+  };
 
   return (
     <Stack gap="lg">
@@ -360,7 +394,7 @@ function ImportSection() {
             clearable
           />
           <Group>
-            <Button leftSection={<IconUpload size={16} />} disabled={!file} loading={upload.loading} onClick={() => file && upload.run(() => expensesApi.importStatement(bank, file))}>
+            <Button leftSection={<IconUpload size={16} />} disabled={!file} loading={upload.loading} onClick={() => file && send(file)}>
               Загрузить
             </Button>
           </Group>
@@ -369,11 +403,16 @@ function ImportSection() {
             <Alert color="teal" radius="lg" variant="light" icon={<IconCheck size={18} />} title="Выписка загружена">
               <Stack gap="xs">
                 <Text size="sm">
-                  Операций: <b>{upload.data.total}</b> · новых: <b>{upload.data.new}</b> · уже были: <b>{upload.data.duplicates}</b> · без категории:{' '}
+                  Операций: <b>{upload.data.total}</b> · новых: <b>{upload.data.new}</b> · уже были: <b>{upload.data.duplicates}</b> · из новых без категории:{' '}
                   <b>{upload.data.uncategorized}</b>
                 </Text>
+                {waiting !== null && (
+                  <Text size="sm">
+                    Всего ждут разбора: <b>{waiting}</b>
+                  </Text>
+                )}
                 <Group gap="sm">
-                  {upload.data.uncategorized > 0 && (
+                  {(waiting ?? upload.data.uncategorized) > 0 && (
                     <Button size="xs" color="orange" variant="light" onClick={go('review')}>
                       Разобрать без категории
                     </Button>
@@ -399,27 +438,33 @@ function CategoriesSection() {
   const [parent, setParent] = useState<string | null>(null);
   const change = useAction<unknown>();
 
-  const run = async (call: () => Promise<unknown>) => {
+  /** true — получилось; при ошибке введённое не стираем (#14). */
+  const run = async (call: () => Promise<unknown>): Promise<boolean> => {
     try {
       await call();
       categories.reload();
+      return true;
     } catch (error) {
       if (notImplemented(error)) {
         notifications.show({ color: 'yellow', title: 'Пример', message: 'Изменения заработают, когда backend научится управлять категориями.' });
-        return;
+        return false;
       }
       void change.run(() => Promise.reject(error));
+      return false;
     }
   };
 
-  const remove = async (category: { id: string; name: string }, hasChildren: boolean) => {
+  /** isTop — категория верхнего уровня: её операции уходят в «Неопределённые», а не к родителю (#18). */
+  const remove = async (category: { id: string; name: string }, isTop: boolean, hasChildren = false) => {
     const ok = await confirmAction({
       title: `Удалить «${category.name}»?`,
       message: (
         <Text size="sm">
-          {hasChildren
-            ? 'Её операции и подкатегории уйдут в «Неопределённые», правила для неё удалятся.'
-            : 'Её операции перейдут в родительскую категорию, правила для неё удалятся.'}
+          {!isTop
+            ? 'Её операции перейдут в родительскую категорию, правила для неё удалятся.'
+            : hasChildren
+              ? 'Подкатегории удалятся вместе с ней, все её операции уйдут в «Неопределённые», правила для неё удалятся.'
+              : 'Её операции уйдут в «Неопределённые», правила для неё удалятся.'}
         </Text>
       ),
       confirmLabel: 'Удалить',
@@ -443,6 +488,8 @@ function CategoriesSection() {
             data={(categories.data ?? []).filter((category) => !category.system_code).map((category) => ({ value: category.id, label: category.name }))}
             value={parent}
             onChange={setParent}
+            searchable
+            nothingFoundMessage="Нет такой"
             clearable
             radius="md"
             w={220}
@@ -450,7 +497,7 @@ function CategoriesSection() {
           <Button
             leftSection={<IconPlus size={16} />}
             disabled={!name.trim()}
-            onClick={() => run(() => expensesApi.createCategory({ name: name.trim(), parent_id: parent })).then(() => setName(''))}
+            onClick={() => run(() => expensesApi.createCategory({ name: name.trim(), parent_id: parent })).then((ok) => ok && setName(''))}
           >
             Добавить
           </Button>
@@ -484,7 +531,7 @@ function CategoriesSection() {
                   </Table.Td>
                   <Table.Td>
                     {!category.system_code && (
-                      <ActionIcon variant="subtle" color="red" onClick={() => remove(category, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
+                      <ActionIcon variant="subtle" color="red" onClick={() => remove(category, true, category.children.length > 0)} aria-label={`Удалить ${category.name}`}>
                         <IconTrash size={16} />
                       </ActionIcon>
                     )}
@@ -594,6 +641,26 @@ function AccountsSection() {
   const change = useAction<unknown>();
   const loans = useLoans();
   const loanName = (id: string | null) => loans.find((loan) => loan.id === id)?.name ?? id;
+  // Проверка до отправки — по-человечески, а не текстом валидатора (#13).
+  const phone = normalizePhone(draft.phone);
+  const phoneError = phone && !/^\+7\d{10}$/.test(phone) ? 'Номер из 11 цифр, например 8 900 000-00-00' : null;
+  const tailError = draft.number_tail && !/^\d{4}$/.test(draft.number_tail) ? 'Последние 4 цифры счёта' : null;
+
+  const removeAccount = async (account: { id: string; name: string; kind: AccountKind }) => {
+    const ok = await confirmAction({
+      title: `Удалить «${account.name}»?`,
+      message: (
+        <Text size="sm">
+          {account.kind === 'credit'
+            ? 'Переводы на этот счёт в следующих выписках перестанут считаться платежами по кредиту.'
+            : 'Переводы на этот номер или счёт в следующих выписках станут обычными тратами. Уже загруженные операции не изменятся.'}
+        </Text>
+      ),
+      confirmLabel: 'Удалить',
+      danger: true,
+    });
+    if (ok) await run(() => expensesApi.deleteAccount(account.id));
+  };
 
   const run = async (call: () => Promise<unknown>) => {
     try {
@@ -640,6 +707,7 @@ function AccountsSection() {
             placeholder="+79991234567"
             value={draft.phone ?? ''}
             onChange={(event) => setDraft({ ...draft, phone: event.currentTarget.value || null })}
+            error={phoneError}
             radius="md"
             w={150}
           />
@@ -648,6 +716,7 @@ function AccountsSection() {
             placeholder="1234"
             value={draft.number_tail ?? ''}
             onChange={(event) => setDraft({ ...draft, number_tail: event.currentTarget.value || null })}
+            error={tailError}
             radius="md"
             w={110}
           />
@@ -662,8 +731,8 @@ function AccountsSection() {
               w={200}
             />
           )}
-          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail) || (draft.kind === 'credit' && !draft.loan_id)}
-            onClick={() => run(() => expensesApi.createAccount({ ...draft, phone: normalizePhone(draft.phone) }))}
+          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail) || (draft.kind === 'credit' && !draft.loan_id) || Boolean(phoneError || tailError)}
+            onClick={() => run(() => expensesApi.createAccount({ ...draft, phone }))}
           >
             Добавить
           </Button>
@@ -693,7 +762,7 @@ function AccountsSection() {
                   <Table.Td>{account.phone ?? (account.number_tail ? `…${account.number_tail}` : '—')}</Table.Td>
                   <Table.Td>{account.bank}</Table.Td>
                   <Table.Td w={50}>
-                    <ActionIcon variant="subtle" color="red" onClick={() => run(() => expensesApi.deleteAccount(account.id))} aria-label={`Удалить ${account.name}`}>
+                    <ActionIcon variant="subtle" color="red" onClick={() => removeAccount(account)} aria-label={`Удалить ${account.name}`}>
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Table.Td>
