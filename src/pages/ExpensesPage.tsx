@@ -27,8 +27,8 @@ import {
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import { expensesApi } from '../api/endpoints';
-import type { AccountKind, ExpenseAccountIn, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
+import { expensesApi, loansApi } from '../api/endpoints';
+import type { AccountKind, ExpenseAccountIn, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, currentMonth, monthTitle } from '../components/expenses/common';
@@ -523,10 +523,29 @@ function CategoriesSection() {
 
 const EMPTY_ACCOUNT: ExpenseAccountIn = { bank: 'alfa', name: '', kind: 'own', number_tail: null, phone: null, loan_id: null };
 
+/** «8 (900) 123-45-67», «+7 900 …», «9001234567» → «+79001234567», как номер в выписке. */
+function normalizePhone(phone: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `+7${digits}`;
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) return `+7${digits.slice(1)}`;
+  return phone.trim();
+}
+
+function useLoans(): LoanSummaryOut[] {
+  const [loans, setLoans] = useState<LoanSummaryOut[]>([]);
+  useEffect(() => {
+    loansApi.list().then(setLoans).catch(() => setLoans([]));
+  }, []);
+  return loans;
+}
+
 function AccountsSection() {
   const accounts = useOrSample(() => expensesApi.accounts(), SAMPLE_ACCOUNTS, 'accounts');
   const [draft, setDraft] = useState<ExpenseAccountIn>(EMPTY_ACCOUNT);
   const change = useAction<unknown>();
+  const loans = useLoans();
+  const loanName = (id: string | null) => loans.find((loan) => loan.id === id)?.name ?? id;
 
   const run = async (call: () => Promise<unknown>) => {
     try {
@@ -560,7 +579,7 @@ function AccountsSection() {
         <Group align="flex-end" gap="sm">
           <SegmentedControl
             value={draft.kind}
-            onChange={(kind) => setDraft({ ...draft, kind: kind as AccountKind })}
+            onChange={(kind) => setDraft({ ...draft, kind: kind as AccountKind, loan_id: kind === 'credit' ? draft.loan_id : null })}
             data={[
               { value: 'own', label: 'Свой' },
               { value: 'credit', label: 'Счёт кредита' },
@@ -585,15 +604,19 @@ function AccountsSection() {
             w={110}
           />
           {draft.kind === 'credit' && (
-            <TextInput
-              label="Кредит (id)"
-              value={draft.loan_id ?? ''}
-              onChange={(event) => setDraft({ ...draft, loan_id: event.currentTarget.value || null })}
+            <Select
+              label="Кредит"
+              placeholder={loans.length ? 'Выбери' : 'Нет кредитов'}
+              data={loans.map((loan) => ({ value: loan.id, label: loan.name }))}
+              value={draft.loan_id}
+              onChange={(loanId) => setDraft({ ...draft, loan_id: loanId })}
               radius="md"
-              w={160}
+              w={200}
             />
           )}
-          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail)} onClick={() => run(() => expensesApi.createAccount(draft))}>
+          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail) || (draft.kind === 'credit' && !draft.loan_id)}
+            onClick={() => run(() => expensesApi.createAccount({ ...draft, phone: normalizePhone(draft.phone) }))}
+          >
             Добавить
           </Button>
         </Group>
@@ -613,6 +636,11 @@ function AccountsSection() {
                     <Badge variant="light" color={account.kind === 'credit' ? 'brand' : 'gray'}>
                       {account.kind === 'credit' ? 'кредит' : 'свой'}
                     </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {account.loan_id ? loanName(account.loan_id) : ''}
+                    </Text>
                   </Table.Td>
                   <Table.Td>{account.phone ?? (account.number_tail ? `…${account.number_tail}` : '—')}</Table.Td>
                   <Table.Td>{account.bank}</Table.Td>

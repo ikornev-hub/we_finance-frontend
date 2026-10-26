@@ -278,6 +278,8 @@ export interface RulePreview {
 export interface ExpenseCategory {
   id: string;
   name: string;
+  /** У подкатегории — id родителя; в дереве у верхнего уровня всегда null. */
+  parent_id?: string | null;
   system_code: string | null;
   target_share: string | null;
   children: { id: string; name: string }[];
