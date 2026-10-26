@@ -158,7 +158,13 @@ export function GoalsSection() {
                     {loan ? 'погашено из' : 'из'} {money(goal.target_amount)}
                   </Text>
                 </Group>
-                <Progress value={progress} size="lg" color={progress >= 100 ? 'teal' : 'brand'} />
+                <Progress value={progress} size="lg" color={progress >= 100 ? 'teal' : 'brand'} striped={goal.projected} />
+                {goal.projected && (
+                  <Text size="xs" c="dimmed">
+                    Прогноз к 1-му числу: прошлые месяцы — столько, сколько влезало в бюджет{loan ? ', ЧДП — по плану' : ''}. Факт — по выписке
+                    {loan ? ' и «Кредитам»' : ''}.
+                  </Text>
+                )}
                 <Group justify="space-between">
                   <Text size="xs" c="dimmed">
                     {loan ? 'план ЧДП в месяц' : 'план в месяц'}
