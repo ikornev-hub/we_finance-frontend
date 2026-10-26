@@ -1,0 +1,21 @@
+/* Цвета подложки и карточек для светлой и тёмной темы — как в референсе. */
+:root {
+  --wf-bg: #f3f4f6;
+  --wf-card: #ffffff;
+  --wf-border: #eceef1;
+}
+
+[data-mantine-color-scheme='dark'] {
+  --wf-bg: #0f1012;
+  --wf-card: #18191c;
+  --wf-border: #26282c;
+}
+
+body {
+  background: var(--wf-bg);
+}
+
+/* Таблицы с деньгами: цифры одинаковой ширины, столбцы ровные. */
+table {
+  font-variant-numeric: tabular-nums;
+}

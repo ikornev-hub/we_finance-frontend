@@ -1,0 +1,20 @@
+# зависимости и сборка
+node_modules/
+dist/
+*.tsbuildinfo
+
+# окружение и секреты — никогда в git
+.env
+.env.*
+
+# бэкапы, скачанные из интерфейса, если их положили сюда (реальные данные!)
+*.backup.json
+backups/
+
+# редакторы и система
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
