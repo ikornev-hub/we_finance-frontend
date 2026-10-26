@@ -1,5 +1,6 @@
 import {
   IconBuildingBank,
+  IconArchive,
   IconCalculator,
   IconChartBar,
   IconCirclePlus,
@@ -54,6 +55,7 @@ export const TABS: Tab[] = [
     label: 'Кредиты',
     sections: [
       { id: 'list', label: 'Мои кредиты', icon: <IconListDetails size={size} /> },
+      { id: 'archive', label: 'Архив', icon: <IconArchive size={size} /> },
       { id: 'create', label: 'Новый кредит', icon: <IconCirclePlus size={size} /> },
     ],
   },

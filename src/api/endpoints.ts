@@ -9,6 +9,7 @@ import type {
   LoanCreateIn,
   LoanDetailOut,
   LoanIn,
+  LoanStatus,
   LoanSummaryOut,
   MoneyRoundResponse,
   Prepayment,
@@ -46,7 +47,8 @@ export const salaryApi = {
 };
 
 export const loansApi = {
-  list: (asOf?: string) => api.get<LoanSummaryOut[]>(`${V1}/loans`, { as_of: asOf }),
+  list: (asOf?: string, status: LoanStatus = 'active') =>
+    api.get<LoanSummaryOut[]>(`${V1}/loans`, { as_of: asOf, status }),
   create: (loan: LoanCreateIn) => api.post<LoanDetailOut>(`${V1}/loans`, loan),
   detail: (id: string, asOf?: string) =>
     api.get<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}`, { as_of: asOf }),
@@ -54,6 +56,9 @@ export const loansApi = {
     api.post<PreviewOut>(`${V1}/loans/${encodeURIComponent(id)}/prepayments/preview`, prepayment),
   addPrepayment: (id: string, prepayment: Prepayment) =>
     api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/prepayments`, prepayment),
+  remove: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/delete`),
+  complete: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/complete`),
+  restore: (id: string) => api.post<LoanDetailOut>(`${V1}/loans/${encodeURIComponent(id)}/restore`),
 };
 
 export const calculatorApi = {

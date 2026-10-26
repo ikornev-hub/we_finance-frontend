@@ -63,7 +63,9 @@ export function HomePage() {
 
   const income = useLoad<YearReportOut>(() => salaryApi.year(year));
   const loans = useLoad<LoanDetailOut[]>(async () => {
-    const list = await loansApi.list();
+    // Завершённые учитываются везде, как активные; удалённые — нигде (С8).
+    const [active, completed] = await Promise.all([loansApi.list(), loansApi.list(undefined, 'completed')]);
+    const list = [...active, ...completed];
     return Promise.all(list.map((loan) => loansApi.detail(loan.id)));
   });
 

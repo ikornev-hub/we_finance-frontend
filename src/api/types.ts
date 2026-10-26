@@ -191,9 +191,14 @@ export interface CalculationOut {
   warnings: WarningOut[];
 }
 
+export type LoanStatus = 'active' | 'completed' | 'deleted';
+
 export interface LoanDetailOut extends CalculationOut {
   id: string;
   name: string;
+  status: LoanStatus;
+  /** Активный и остаток на сегодня 0: можно перевести в «Завершённые». */
+  can_complete: boolean;
 }
 
 export interface LoanSummaryOut {
@@ -202,6 +207,8 @@ export interface LoanSummaryOut {
   principal: Money;
   balance: Money;
   close_date: IsoDate;
+  status: LoanStatus;
+  can_complete: boolean;
 }
 
 export interface PreviewOut {
