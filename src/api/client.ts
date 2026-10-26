@@ -1,4 +1,6 @@
-// Один fetch на всё приложение: JSON туда-обратно и понятные ошибки.
+// Один fetch на всё приложение: JSON туда-обратно, токен входа и понятные ошибки.
+
+import { clearToken, getToken } from '../lib/session';
 
 export interface FieldProblem {
   where: string; // "profile → terms → 1 → salary"
@@ -31,7 +33,7 @@ interface RequestOptions {
   accept?: number[];
 }
 
-const OFFLINE_MESSAGE = 'Бэкенд не отвечает. Запущен ли uvicorn на 127.0.0.1:8000?';
+const OFFLINE_MESSAGE = 'Сервер не отвечает. Проверь, что стенд запущен.';
 const LOC_SKIP = new Set(['body', 'query', 'path']);
 
 function toQueryString(query: Query = {}): string {
@@ -65,7 +67,10 @@ export async function request<T>(method: string, path: string, options: RequestO
   try {
     response = await fetch(path + toQueryString(options.query), {
       method,
-      headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch {
@@ -81,6 +86,9 @@ export async function request<T>(method: string, path: string, options: RequestO
       data = text;
     }
   }
+
+  // Токен истёк или отозван — забываем его, приложение покажет страницу входа.
+  if (response.status === 401 && getToken()) clearToken();
 
   const accepted = options.accept?.includes(response.status) && data !== null && typeof data === 'object';
   if (!response.ok && !accepted) {
