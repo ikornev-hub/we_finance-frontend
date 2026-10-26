@@ -425,6 +425,16 @@ export interface SavingsGoal {
   /** Месяц достижения «2027-08» при реальном взносе; null — не достигается. */
   eta: string | null;
   account_tails: string[];
+  /** С какого числа копить; null — сразу. */
+  start_date: IsoDate | null;
+  /** Сколько положить в день аванса и остатка зарплаты в этом месяце. */
+  paydays: GoalPayday[];
+}
+
+export interface GoalPayday {
+  date: IsoDate;
+  kind: 'advance' | 'remainder';
+  amount: Money;
 }
 
 export interface SavingsGoalIn {
@@ -433,6 +443,7 @@ export interface SavingsGoalIn {
   deadline?: IsoDate | null;
   monthly_amount?: Money | null;
   initial_amount?: Money;
+  start_date?: IsoDate | null;
 }
 
 export interface ContributionIn {

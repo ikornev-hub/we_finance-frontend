@@ -14,6 +14,7 @@ export function DateField({ label, value, onChange, width, description }: FieldP
   return (
     <TextInput
       type="date"
+      max="9999-12-31" // иначе Chrome даёт ввести шестизначный год
       label={label}
       description={description}
       value={value}
