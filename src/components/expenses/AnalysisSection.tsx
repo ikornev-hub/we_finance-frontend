@@ -9,6 +9,7 @@ import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert } from '../ErrorAlert';
 import { currentMonth, monthTitle, shiftMonth } from './common';
+import { ForecastBlock } from './ForecastBlock';
 
 const chartMoney = (value: number) => `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`;
 const SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -22,7 +23,7 @@ const SERIES = [
   { name: 'Служебные', code: 'service', color: 'yellow.5' },
 ];
 
-const EMPTY: SpendingAnalysis = { months: [], stats: [], pace: null };
+const EMPTY: SpendingAnalysis = { months: [], stats: [], pace: null, full_months: [] };
 
 /** Выброс: месяц больше медианы в полтора раза и заметно по сумме. */
 function spike(amount: number, stat: AnalysisStat | undefined): boolean {
@@ -64,6 +65,8 @@ export function AnalysisSection() {
       <ErrorAlert error={data.error} />
 
       {analysis.pace && <PaceBlock pace={analysis.pace} />}
+
+      <ForecastBlock />
 
       <Panel title="Группы по месяцам" subtitle="Сколько уходит в каждую группу; «Отложено» — на цели">
         <BarChart

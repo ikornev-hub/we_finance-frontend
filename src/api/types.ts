@@ -504,4 +504,6 @@ export interface SpendingAnalysis {
   months: AnalysisMonth[];
   stats: AnalysisStat[];
   pace: { month: string; day: number; days: number; groups: PaceItem[]; categories: PaceItem[] } | null;
+  /** Закрытые месяцы, целиком покрытые выпиской: по ним медиана. */
+  full_months: string[];
 }
