@@ -3,7 +3,7 @@ import { IconArrowRight, IconCalendarDue, IconListSearch } from '@tabler/icons-r
 import { useEffect, useState } from 'react';
 
 import { expensesApi, loansApi, salaryApi } from '../api/endpoints';
-import type { IncomeCheck, LoanDetailOut, YearReportOut } from '../api/types';
+import type { IncomeCheck, LoanDetailOut, SavingsGoal, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CHECK_BADGE, MonthSwitch, SampleNotice, monthTitle, percent, useSelectedMonth } from '../components/expenses/common';
@@ -41,6 +41,7 @@ export function HomePage() {
 
   const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);
   const checks = useOrSample(() => expensesApi.incomeCheck(year), SAMPLE_INCOME_CHECK, String(year));
+  const goals = useOrSample(() => expensesApi.goals(month), [] as SavingsGoal[], `goals/${month}`);
   const salary = useLoad<YearReportOut>(() => salaryApi.year(Number(today.slice(0, 4))));
   const loans = useLoad<LoanDetailOut[]>(async () => {
     const [active, completed] = await Promise.all([loansApi.list(), loansApi.list(undefined, 'completed')]);
@@ -173,6 +174,47 @@ export function HomePage() {
                   ))}
                 </Table.Tbody>
               </Table>
+            )}
+          </Panel>
+
+          <Panel
+            title="Цели"
+            subtitle="Сначала себе: сколько отложено и успеваешь ли к сроку"
+            actions={
+              <Button variant="subtle" size="xs" rightSection={<IconArrowRight size={14} />} onClick={() => (window.location.hash = '#expenses/goals')}>
+                Все цели
+              </Button>
+            }
+          >
+            {(goals.data ?? []).length === 0 ? (
+              <Text size="sm" c="dimmed">
+                Целей пока нет — заведи подушку, квартиру, свадьбу в «Расходы → Цели».
+              </Text>
+            ) : (
+              <Stack gap="sm">
+                {(goals.data ?? []).map((goal) => {
+                  const progress = Math.min((Number(goal.saved) / Number(goal.target_amount)) * 100, 100);
+                  const late = !goal.eta || Boolean(goal.deadline && goal.eta > goal.deadline.slice(0, 7));
+                  return (
+                    <Stack key={goal.id} gap={4}>
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={600}>
+                          {goal.name}
+                        </Text>
+                        <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                          {money(goal.saved)} из {money(goal.target_amount)}
+                        </Text>
+                      </Group>
+                      <Progress value={progress} size="sm" color={late ? 'red' : 'teal'} />
+                      <Text size="xs" c={late ? 'red' : 'dimmed'}>
+                        в этом месяце {money(goal.contribution)}
+                        {Number(goal.contribution) < Number(goal.plan) ? ` из плана ${money(goal.plan)}` : ''}
+                        {!goal.eta ? ' · при таком взносе не достигается' : late ? ' · не успеваешь к сроку' : ''}
+                      </Text>
+                    </Stack>
+                  );
+                })}
+              </Stack>
             )}
           </Panel>
 

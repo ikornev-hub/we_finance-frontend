@@ -28,10 +28,12 @@ import {
 import { useEffect, useState } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
-import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
+import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, monthTitle, useSelectedMonth } from '../components/expenses/common';
+import { AnalysisSection } from '../components/expenses/AnalysisSection';
+import { GoalsSection } from '../components/expenses/GoalsSection';
 import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
@@ -45,7 +47,7 @@ import { date, money } from '../lib/format';
 import { notImplemented, useOrSample } from '../lib/sample';
 import { useAction } from '../lib/useAction';
 
-export type ExpensesSection = 'month' | 'review' | 'import' | 'categories' | 'accounts';
+export type ExpensesSection = 'month' | 'analysis' | 'goals' | 'review' | 'import' | 'categories' | 'accounts';
 
 const go = (section: ExpensesSection) => () => (window.location.hash = `#expenses/${section}`);
 
@@ -67,6 +69,10 @@ export function ExpensesPage({ section }: { section: ExpensesSection }) {
       return <ImportSection />;
     case 'categories':
       return <CategoriesSection />;
+    case 'analysis':
+      return <AnalysisSection />;
+    case 'goals':
+      return <GoalsSection />;
     case 'accounts':
       return <AccountsSection />;
     default:
@@ -733,7 +739,7 @@ function LimitEditor({ category, onSave }: { category: { target_share: string | 
 
 // ---------- свои счета ----------
 
-const EMPTY_ACCOUNT: ExpenseAccountIn = { bank: 'alfa', name: '', kind: 'own', number_tail: null, phone: null, loan_id: null };
+const EMPTY_ACCOUNT: ExpenseAccountIn = { bank: 'alfa', name: '', kind: 'own', number_tail: null, phone: null, loan_id: null, goal_id: null };
 
 /** «8 (900) 123-45-67», «+7 900 …», «9001234567» → «+79001234567», как номер в выписке. */
 function normalizePhone(phone: string | null): string | null {
@@ -757,6 +763,7 @@ function AccountsSection() {
   const [draft, setDraft] = useState<ExpenseAccountIn>(EMPTY_ACCOUNT);
   const change = useAction<unknown>();
   const loans = useLoans();
+  const goals = useOrSample(() => expensesApi.goals(), [] as SavingsGoal[], 'goals').data ?? [];
   const loanName = (id: string | null) => loans.find((loan) => loan.id === id)?.name ?? id;
   // Проверка до отправки — по-человечески, а не текстом валидатора (#13).
   const phone = normalizePhone(draft.phone);
@@ -811,10 +818,11 @@ function AccountsSection() {
         <Group align="flex-end" gap="sm">
           <SegmentedControl
             value={draft.kind}
-            onChange={(kind) => setDraft({ ...draft, kind: kind as AccountKind, loan_id: kind === 'credit' ? draft.loan_id : null })}
+            onChange={(kind) => setDraft({ ...draft, kind: kind as AccountKind, loan_id: kind === 'credit' ? draft.loan_id : null, goal_id: kind === 'savings' ? draft.goal_id : null })}
             data={[
               { value: 'own', label: 'Свой' },
               { value: 'credit', label: 'Счёт кредита' },
+              { value: 'savings', label: 'Накопительный' },
             ]}
           />
           <TextInput label="Название" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })} radius="md" w={180} />
@@ -837,6 +845,17 @@ function AccountsSection() {
             radius="md"
             w={110}
           />
+          {draft.kind === 'savings' && (
+            <Select
+              label="Цель"
+              placeholder={goals.length ? 'Выбери' : 'Сначала заведи цель'}
+              data={goals.map((goal) => ({ value: goal.id, label: goal.name }))}
+              value={draft.goal_id ?? null}
+              onChange={(goalId) => setDraft({ ...draft, goal_id: goalId })}
+              radius="md"
+              w={200}
+            />
+          )}
           {draft.kind === 'credit' && (
             <Select
               label="Кредит"
@@ -848,7 +867,7 @@ function AccountsSection() {
               w={200}
             />
           )}
-          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail) || (draft.kind === 'credit' && !draft.loan_id) || Boolean(phoneError || tailError)}
+          <Button leftSection={<IconPlus size={16} />} disabled={!draft.name.trim() || (!draft.phone && !draft.number_tail) || (draft.kind === 'credit' && !draft.loan_id) || (draft.kind === 'savings' && (!draft.goal_id || !draft.number_tail)) || Boolean(phoneError || tailError)}
             onClick={() => run(() => expensesApi.createAccount({ ...draft, phone }))}
           >
             Добавить
@@ -867,13 +886,13 @@ function AccountsSection() {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Badge variant="light" color={account.kind === 'credit' ? 'brand' : 'gray'}>
-                      {account.kind === 'credit' ? 'кредит' : 'свой'}
+                    <Badge variant="light" color={account.kind === 'credit' ? 'brand' : account.kind === 'savings' ? 'teal' : 'gray'}>
+                      {account.kind === 'credit' ? 'кредит' : account.kind === 'savings' ? 'накопительный' : 'свой'}
                     </Badge>
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm" c="dimmed">
-                      {account.loan_id ? loanName(account.loan_id) : ''}
+                      {account.loan_id ? loanName(account.loan_id) : account.goal_id ? `цель: ${goals.find((goal) => goal.id === account.goal_id)?.name ?? ''}` : ''}
                     </Text>
                   </Table.Td>
                   <Table.Td>{account.phone ?? (account.number_tail ? `…${account.number_tail}` : '—')}</Table.Td>

@@ -6,6 +6,8 @@ import {
   IconFileUpload,
   IconListCheck,
   IconReportMoney,
+  IconChartLine,
+  IconPigMoney,
   IconCalculator,
   IconChartBar,
   IconCirclePlus,
@@ -60,6 +62,8 @@ export const TABS: Tab[] = [
     label: 'Расходы',
     sections: [
       { id: 'month', label: 'Месяц', icon: <IconReportMoney size={size} /> },
+      { id: 'analysis', label: 'Анализ', icon: <IconChartLine size={size} /> },
+      { id: 'goals', label: 'Цели', icon: <IconPigMoney size={size} /> },
       { id: 'review', label: 'Без категории', icon: <IconListCheck size={size} /> },
       { id: 'import', label: 'Загрузить выписку', icon: <IconFileUpload size={size} /> },
       { id: 'categories', label: 'Категории', icon: <IconCategory size={size} /> },

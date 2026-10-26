@@ -128,11 +128,13 @@ export const SAMPLE_MONTH: MonthReport = {
   disposable: '99500.00',
   uncategorized_count: 4,
   has_statement: true,
+  saved: '0.00',
   closed: true,
   warnings: [],
   forecast: {
     income: '180000.00',
     mandatory: '80500.00',
+    savings: '0.00',
     disposable: '99500.00',
     spent: '20123.76',
     can_spend: '79376.24',

@@ -315,7 +315,7 @@ export interface GroupPatch {
   target_amount?: Money | null;
 }
 
-export type AccountKind = 'own' | 'credit';
+export type AccountKind = 'own' | 'credit' | 'savings';
 
 export interface ExpenseAccount {
   id: string;
@@ -325,6 +325,8 @@ export interface ExpenseAccount {
   number_tail: string | null;
   phone: string | null;
   loan_id: string | null;
+  /** У накопительного счёта — его цель. */
+  goal_id?: string | null;
 }
 
 export type ExpenseAccountIn = Omit<ExpenseAccount, 'id'>;
@@ -368,6 +370,8 @@ export interface MonthForecast {
   income: Money;
   /** Кредит, жильё, связь, близкие… — вычитаются из дохода. */
   mandatory: Money;
+  /** Отложить на цели: «сначала себе». */
+  savings: Money;
   disposable: Money;
   spent: Money;
   can_spend: Money;
@@ -383,6 +387,8 @@ export interface MonthReport {
   disposable: Money;
   uncategorized_count: number;
   has_statement: boolean;
+  /** Отложено по факту: на накопительные счета и вручную. */
+  saved: Money;
   /** Месяц закончился: прогноз = факт. */
   closed: boolean;
   warnings: string[];
@@ -401,4 +407,70 @@ export interface IncomeCheck {
   operation_date: IsoDate | null;
   operation_amount: Money | null;
   difference: Money | null;
+}
+
+/** Цель накоплений на месяц: прогресс, план, реальный взнос, месяц достижения. */
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  target_amount: Money;
+  deadline: IsoDate | null;
+  monthly_amount: Money | null;
+  initial_amount: Money;
+  saved: Money;
+  saved_before_month: Money;
+  plan: Money;
+  /** Сколько реально откладывается: не хватает на все — пропорционально. */
+  contribution: Money;
+  /** Месяц достижения «2027-08» при реальном взносе; null — не достигается. */
+  eta: string | null;
+  account_tails: string[];
+}
+
+export interface SavingsGoalIn {
+  name: string;
+  target_amount: Money;
+  deadline?: IsoDate | null;
+  monthly_amount?: Money | null;
+  initial_amount?: Money;
+}
+
+export interface ContributionIn {
+  day: IsoDate;
+  amount: Money;
+  comment?: string | null;
+}
+
+export interface AnalysisMonth {
+  month: string;
+  income: Money;
+  mandatory: Money;
+  saved: Money;
+  groups: Record<string, Money>;
+  categories: Record<string, Money>;
+}
+
+export interface AnalysisStat {
+  kind: 'group' | 'category';
+  id: string;
+  name: string;
+  group_code: GroupCode;
+  median: Money;
+  mean: Money;
+  max: Money;
+  max_month: string | null;
+}
+
+export interface PaceItem {
+  id: string;
+  name: string;
+  amount: Money;
+  projected: Money;
+  target: Money | null;
+}
+
+export interface SpendingAnalysis {
+  months: AnalysisMonth[];
+  stats: AnalysisStat[];
+  pace: { month: string; day: number; days: number; groups: PaceItem[]; categories: PaceItem[] } | null;
 }
