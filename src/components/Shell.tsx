@@ -13,11 +13,12 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import { useInterval } from '@mantine/hooks';
-import { IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
+import { IconLogout, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { serviceApi } from '../api/endpoints';
+import { clearToken } from '../lib/session';
 import type { HealthResponse, VersionResponse } from '../api/types';
 import { type Route, TABS, type TabId, href } from '../navigation';
 import classes from './Shell.module.css';
@@ -130,6 +131,11 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
                 aria-label="Система"
               >
                 <IconSettings size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Выйти">
+              <ActionIcon variant="subtle" color="gray" size="lg" radius="xl" onClick={clearToken} aria-label="Выйти">
+                <IconLogout size={18} />
               </ActionIcon>
             </Tooltip>
           </Group>

@@ -1,12 +1,20 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
 import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+import { useToken } from './lib/session';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { IncomePage, type IncomeSection } from './pages/IncomePage';
 import { LoansPage, type LoansSection } from './pages/LoansPage';
 import { ServicePage } from './pages/ServicePage';
 
 export function App() {
+  const token = useToken();
+  if (!token) return <LoginPage />;
+  return <SignedIn />;
+}
+
+function SignedIn() {
   const route = useRoute();
   const key = `${route.tab.id}/${route.section.id}/${route.param ?? ''}`;
 

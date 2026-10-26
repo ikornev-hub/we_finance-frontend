@@ -24,6 +24,10 @@ import type {
 
 const V1 = '/api/v1';
 
+export const authApi = {
+  login: (login: string, password: string) => api.post<{ token: string }>(`${V1}/auth/login`, { login, password }),
+};
+
 export const serviceApi = {
   // 503 — API живо, но база недоступна: это тоже ответ, а не ошибка связи.
   health: () => request<HealthResponse>('GET', '/health', { accept: [503] }),
