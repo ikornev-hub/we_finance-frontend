@@ -11,6 +11,7 @@ import type {
   ImportResult,
   IncomeCheck,
   MonthReport,
+  RulePreview,
   Absence,
   CalculationIn,
   CalculationOut,
@@ -90,6 +91,7 @@ export const expensesApi = {
       category_id: query.category_id,
       uncategorized: query.uncategorized ? 'true' : undefined,
     }),
+  similar: (id: string) => api.get<RulePreview>(`${V1}/expenses/operations/${enc(id)}/similar`),
   setCategory: (id: string, categoryId: string, remember: boolean) =>
     api.patch<CategoryChange>(`${V1}/expenses/operations/${enc(id)}`, { category_id: categoryId, remember }),
   categories: () => api.get<ExpenseCategory[]>(`${V1}/expenses/categories`),

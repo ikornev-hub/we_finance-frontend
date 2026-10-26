@@ -264,6 +264,15 @@ export interface ExpenseRule {
 export interface CategoryChange {
   operation: ExpenseOperation;
   rule: ExpenseRule | null;
+  /** Неразобранные операции, которые правило разложило сразу. */
+  applied: ExpenseOperation[];
+}
+
+/** Что будет, если «запомнить»: правило и операции, которые лягут туда же. null — нечего помнить (QR). */
+export interface RulePreview {
+  match_kind: 'counterparty' | 'merchant' | null;
+  pattern: string | null;
+  operations: ExpenseOperation[];
 }
 
 export interface ExpenseCategory {

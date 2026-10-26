@@ -25,10 +25,10 @@ import {
   IconTrash,
   IconUpload,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { expensesApi } from '../api/endpoints';
-import type { AccountKind, ExpenseAccountIn, ExpenseCategory, ExpenseOperation, ImportResult } from '../api/types';
+import type { AccountKind, ExpenseAccountIn, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, currentMonth, monthTitle } from '../components/expenses/common';
@@ -210,6 +210,7 @@ function OperationRow({
   const [remember, setRemember] = useState(withRemember);
   const save = useAction<unknown>();
   const who = operation.counterparty ?? operation.merchant;
+  const preview = useRulePreview(operation.id, withRemember && remember && Boolean(who));
 
   const submit = async () => {
     if (!category) return;
@@ -218,7 +219,9 @@ function OperationRow({
       notifications.show({
         color: 'teal',
         title: 'Категория сохранена',
-        message: result.rule ? `Запомнил: «${result.rule.pattern}» → эта категория` : 'Только для этой операции',
+        message: result.rule
+          ? `Запомнил: «${result.rule.pattern}» → эта категория` + (result.applied.length ? `. Ещё разложено: ${result.applied.length}` : '')
+          : 'Только для этой операции',
       });
       onChanged();
     } catch (error) {
@@ -246,6 +249,12 @@ function OperationRow({
           <Text size="xs" c="dimmed" lineClamp={1}>
             {operation.description}
           </Text>
+          {preview && <SimilarList preview={preview} />}
+          {withRemember && !who && (
+            <Text size="xs" c="dimmed">
+              Запомнить нечего: в выписке нет ни получателя, ни магазина. Такие разбираются вручную.
+            </Text>
+          )}
           <ErrorAlert error={save.error} />
         </Stack>
       </Table.Td>
@@ -266,6 +275,48 @@ function OperationRow({
         </Group>
       </Table.Td>
     </Table.Tr>
+  );
+}
+
+/** Что заберёт «Запомнить» — грузится, только пока галочка стоит. Пример (404/405) — ничего не показываем. */
+function useRulePreview(operationId: string, enabled: boolean): RulePreview | null {
+  const [preview, setPreview] = useState<RulePreview | null>(null);
+  useEffect(() => {
+    if (!enabled) {
+      setPreview(null);
+      return;
+    }
+    let alive = true;
+    expensesApi
+      .similar(operationId)
+      .then((result) => alive && setPreview(result))
+      .catch(() => alive && setPreview(null));
+    return () => {
+      alive = false;
+    };
+  }, [operationId, enabled]);
+  return preview;
+}
+
+function SimilarList({ preview }: { preview: RulePreview }) {
+  if (preview.operations.length === 0) {
+    return (
+      <Text size="xs" c="dimmed">
+        Других таких без категории нет — правило сработает на следующих выписках.
+      </Text>
+    );
+  }
+  return (
+    <Stack gap={2} mt={4}>
+      <Text size="xs" fw={600} c="orange">
+        Сюда же лягут ещё {preview.operations.length}:
+      </Text>
+      {preview.operations.map((similar) => (
+        <Text key={similar.id} size="xs" c="dimmed">
+          {date(similar.operated_at)} · {money(similar.amount)} · {similar.description}
+        </Text>
+      ))}
+    </Stack>
   );
 }
 
