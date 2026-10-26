@@ -113,14 +113,15 @@ function MonthSection() {
           )}
           <ForecastPanel report={report.data} />
           <MonthTree report={report.data} onPick={(id, title) => setPicked({ id, title })} />
-          {picked && <CategoryOperations month={month} categoryId={picked.id} title={picked.title} />}
+          {picked && <CategoryOperations month={month} categoryId={picked.id} title={picked.title} onChanged={report.reload} />}
         </>
       )}
     </Stack>
   );
 }
 
-function CategoryOperations({ month, categoryId, title }: { month: string; categoryId: string; title: string }) {
+/** Операции категории месяца; перенос операции пересчитывает и сам месяц (onChanged). */
+function CategoryOperations({ month, categoryId, title, onChanged }: { month: string; categoryId: string; title: string; onChanged: () => void }) {
   const operations = useOrSample(
     () => expensesApi.operations({ month, category_id: categoryId }),
     sampleOperations(categoryId),
@@ -132,7 +133,14 @@ function CategoryOperations({ month, categoryId, title }: { month: string; categ
       {operations.sample && <SampleNotice what="Операции" />}
       <ErrorAlert error={operations.error} />
       {operations.data && categories.data && (
-        <OperationsTable operations={operations.data} categories={categories.data} onChanged={operations.reload} />
+        <OperationsTable
+          operations={operations.data}
+          categories={categories.data}
+          onChanged={() => {
+            operations.reload();
+            onChanged();
+          }}
+        />
       )}
     </Panel>
   );
