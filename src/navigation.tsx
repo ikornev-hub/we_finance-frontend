@@ -7,6 +7,7 @@ import {
   IconListCheck,
   IconReportMoney,
   IconChartLine,
+  IconChartPie,
   IconPigMoney,
   IconCalculator,
   IconChartBar,
@@ -61,6 +62,7 @@ export const TABS: Tab[] = [
     id: 'expenses',
     label: 'Расходы',
     sections: [
+      { id: 'budget', label: 'Бюджет', icon: <IconChartPie size={size} /> },
       { id: 'month', label: 'Месяц', icon: <IconReportMoney size={size} /> },
       { id: 'analysis', label: 'Анализ', icon: <IconChartLine size={size} /> },
       { id: 'goals', label: 'Цели', icon: <IconPigMoney size={size} /> },

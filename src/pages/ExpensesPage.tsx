@@ -35,6 +35,7 @@ import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { AnalysisSection } from '../components/expenses/AnalysisSection';
+import { BudgetSection } from '../components/expenses/BudgetSection';
 import { GoalsSection } from '../components/expenses/GoalsSection';
 import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
@@ -49,7 +50,7 @@ import { date, money } from '../lib/format';
 import { notImplemented, useOrSample } from '../lib/sample';
 import { useAction } from '../lib/useAction';
 
-export type ExpensesSection = 'month' | 'analysis' | 'goals' | 'review' | 'import' | 'categories' | 'accounts';
+export type ExpensesSection = 'budget' | 'month' | 'analysis' | 'goals' | 'review' | 'import' | 'categories' | 'accounts';
 
 const go = (section: ExpensesSection) => () => (window.location.hash = `#expenses/${section}`);
 
@@ -75,6 +76,8 @@ export function ExpensesPage({ section }: { section: ExpensesSection }) {
       return <AnalysisSection />;
     case 'goals':
       return <GoalsSection />;
+    case 'budget':
+      return <BudgetSection />;
     case 'accounts':
       return <AccountsSection />;
     default:
