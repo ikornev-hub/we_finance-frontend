@@ -3,7 +3,6 @@ import {
   IconCalculator,
   IconChartBar,
   IconCirclePlus,
-  IconDatabaseExport,
   IconHeartbeat,
   IconHome,
   IconListDetails,
@@ -69,7 +68,6 @@ export const TABS: Tab[] = [
     hidden: true,
     sections: [
       { id: 'status', label: 'Состояние и утилиты', icon: <IconHeartbeat size={size} /> },
-      { id: 'backups', label: 'Бэкапы', icon: <IconDatabaseExport size={size} /> },
     ],
   },
 ];

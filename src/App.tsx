@@ -1,6 +1,5 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
-import { BackupsPage } from './pages/BackupsPage';
 import { HomePage } from './pages/HomePage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { IncomePage, type IncomeSection } from './pages/IncomePage';
@@ -23,7 +22,7 @@ export function App() {
       page = <IncomePage section={route.section.id as IncomeSection} />;
       break;
     case 'system':
-      page = route.section.id === 'backups' ? <BackupsPage /> : <ServicePage />;
+      page = <ServicePage />;
       break;
     default:
       page = <HomePage />;
