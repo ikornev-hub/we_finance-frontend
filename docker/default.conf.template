@@ -10,6 +10,8 @@ server {
     # API и служебные эндпоинты — на backend (BACKEND_URL подставляет образ nginx при старте).
     location ~ ^/(api|health|version) {
         proxy_pass ${BACKEND_URL};
+        # годовая выписка в PDF — 1–2 МБ; по умолчанию nginx режет всё больше 1 МБ (413)
+        client_max_body_size 20m;
         proxy_set_header Host $host;
     }
 }

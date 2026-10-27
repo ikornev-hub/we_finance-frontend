@@ -463,14 +463,14 @@ function ImportSection() {
             value={bank}
             onChange={setBank}
             data={[
-              { value: 'alfa', label: 'Альфа-Банк (XLSX)' },
+              { value: 'alfa', label: 'Альфа-Банк (XLSX или PDF)' },
               { value: 'ozon', label: 'Озон Банк (PDF) — скоро', disabled: true },
             ]}
           />
           <FileInput
             label="Файл выписки"
             placeholder="Выбери файл"
-            accept=".xlsx"
+            accept=".xlsx,.pdf"
             value={file}
             onChange={setFile}
             leftSection={<IconFileSpreadsheet size={16} />}
