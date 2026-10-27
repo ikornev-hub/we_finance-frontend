@@ -1,169 +1,217 @@
 import {
   ActionIcon,
   AppShell,
-  Badge,
   Box,
+  Burger,
+  Button,
+  Drawer,
   Group,
-  SegmentedControl,
-  Stack,
+  Menu,
+  NavLink,
+  ScrollArea,
   Text,
-  Tooltip,
-  UnstyledButton,
   useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core';
-import { useInterval } from '@mantine/hooks';
-import { IconLogout, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useDisclosure } from '@mantine/hooks';
+import { IconChevronDown, IconHeartbeat, IconLogout, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
-import { serviceApi } from '../api/endpoints';
 import { clearToken } from '../lib/session';
-import type { HealthResponse, VersionResponse } from '../api/types';
-import { type Route, TABS, type TabId, href } from '../navigation';
+import { type Route, type Tab, TABS, href, sectionHref } from '../navigation';
+import { MonthSwitch, YearSwitch, useSelectedMonth, useSelectedYear } from './expenses/common';
 import classes from './Shell.module.css';
 
-type Status = { health: HealthResponse | null; version: VersionResponse | null; offline: boolean };
+// Шапка (решение заказчика 2026-10-27): левой колонки нет, разделы — выпадающий список вкладки,
+// на телефоне разделы в бургере. Шапка: меню слева, месяц по центру, ⚙ справа. Шапка прозрачная, контент едет под ней.
 
-/** Статус бэкенда: опрос /health раз в 15 секунд и /version при старте. */
-function useBackendStatus(): Status {
-  const [status, setStatus] = useState<Status>({ health: null, version: null, offline: false });
+/** Экраны, которые показывают выбранный месяц: на них переключатель месяца висит в шапке. */
+const MONTH_SCREENS = new Set(['home/cinema', 'expenses/budget', 'expenses/month', 'goals/main', 'expenses/review', 'expenses/analysis']);
 
-  const check = async () => {
-    try {
-      const health = await serviceApi.health();
-      setStatus((prev) => ({ ...prev, health, offline: false }));
-    } catch {
-      setStatus((prev) => ({ ...prev, health: null, offline: true }));
-    }
-  };
+const MENU_TABS = TABS.filter((tab) => !tab.hidden);
+const go = (hash: string) => (window.location.hash = hash);
 
-  const interval = useInterval(check, 15000);
-  useEffect(() => {
-    void check();
-    serviceApi
-      .version()
-      .then((version) => setStatus((prev) => ({ ...prev, version })))
-      .catch(() => undefined);
-    interval.start();
-    return interval.stop;
-    // Опрос запускается один раз при старте приложения.
-  }, []);
+/** Экраны, которые показывают год: в шапке — переключатель года (год выбранного месяца). */
+const YEAR_SCREENS = new Set(['income/overview']);
 
-  return status;
+function HeaderMonth() {
+  const [month, setMonth] = useSelectedMonth();
+  return <MonthSwitch month={month} onChange={setMonth} />;
 }
 
-function StatusPill({ status }: { status: Status }) {
-  const color = status.offline ? 'red' : !status.health ? 'gray' : status.health.status === 'ok' ? 'teal' : 'yellow';
-  const label = status.offline
-    ? 'Сервер не отвечает'
-    : !status.health
-      ? 'Проверяю…'
-      : status.health.status === 'ok'
-        ? 'Всё работает'
-        : 'База данных недоступна';
+function HeaderYear() {
+  const [year, setYear] = useSelectedYear();
+  return <YearSwitch year={year} onChange={setYear} />;
+}
+
+/** Подсвеченная вкладка шапки: у скрытой (калькулятор) — её родитель. */
+function activeTab(route: Route): string {
+  return route.tab.parent ?? route.tab.id;
+}
+
+function isActive(route: Route, tab: Tab, sectionId: string, link?: string): boolean {
+  return link ? route.tab.id === link : route.tab.id === tab.id && route.section.id === sectionId;
+}
+
+function useTheme() {
+  const { setColorScheme } = useMantineColorScheme();
+  const scheme = useComputedColorScheme('dark');
+  return { dark: scheme === 'dark', toggle: () => setColorScheme(scheme === 'dark' ? 'light' : 'dark') };
+}
+
+/** Вкладка шапки: клик открывает список разделов (наведения на планшете нет). */
+function TabMenu({ tab, route }: { tab: Tab; route: Route }) {
+  const active = activeTab(route) === tab.id;
+  const sections = tab.sections.filter((section) => !section.hidden);
+  // Один раздел — список не нужен: клик сразу ведёт на него.
+  if (sections.length === 1) {
+    return (
+      <Button
+        variant={active ? 'light' : 'subtle'}
+        color={active ? 'brand' : 'gray'}
+        radius="xl"
+        className={classes.tab}
+        data-active={active || undefined}
+        onClick={() => go(sectionHref(tab, sections[0]))}
+      >
+        {tab.label}
+      </Button>
+    );
+  }
   return (
-    <Tooltip label={status.offline ? 'Сервер не отвечает — проверь, что стенд запущен' : 'Проверяется раз в 15 секунд'}>
-      <Group gap={8} className={classes.pill} wrap="nowrap">
-        <Box className={classes.dot} bg={`${color}.6`} />
-        <Text size="xs" fw={500} visibleFrom="sm">
-          {label}
-        </Text>
-        {status.version && (
-          <Badge variant="light" color="gray" size="sm" radius="xl">
-            v{status.version.version}
-          </Badge>
-        )}
-      </Group>
-    </Tooltip>
+    <Menu position="bottom-start" offset={6} radius="md" shadow="lg" withinPortal>
+      <Menu.Target>
+        <Button
+          variant={active ? 'light' : 'subtle'}
+          color={active ? 'brand' : 'gray'}
+          radius="xl"
+          className={classes.tab}
+          data-active={active || undefined}
+          rightSection={<IconChevronDown size={14} />}
+        >
+          {tab.label}
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown miw={220}>
+        {sections.map((section) => (
+          <Menu.Item
+            key={section.id}
+            leftSection={section.icon}
+            onClick={() => go(sectionHref(tab, section))}
+            className={isActive(route, tab, section.id, section.link) ? classes.current : undefined}
+          >
+            {section.label}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 
-function ThemeToggle() {
-  const { setColorScheme } = useMantineColorScheme();
-  const scheme = useComputedColorScheme('light');
+/** ⚙: система, тема, выход. */
+function SettingsMenu({ route }: { route: Route }) {
+  const theme = useTheme();
   return (
-    <Tooltip label={scheme === 'dark' ? 'Светлая тема' : 'Тёмная тема'} position="right">
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        size="lg"
-        radius="xl"
-        onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}
-        aria-label="Переключить тему"
-      >
-        {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-      </ActionIcon>
-    </Tooltip>
+    <Menu position="bottom-end" offset={6} radius="md" shadow="lg" withinPortal>
+      <Menu.Target>
+        <ActionIcon variant={route.tab.id === 'system' ? 'light' : 'subtle'} color="gray" size="lg" radius="xl" aria-label="Настройки">
+          <IconSettings size={20} />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown miw={220}>
+        <Menu.Item leftSection={<IconHeartbeat size={18} />} onClick={() => go(href('system'))}>
+          Система
+        </Menu.Item>
+        <Menu.Item leftSection={theme.dark ? <IconSun size={18} /> : <IconMoon size={18} />} onClick={theme.toggle} closeMenuOnClick={false}>
+          {theme.dark ? 'Светлая тема' : 'Тёмная тема'}
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item leftSection={<IconLogout size={18} />} color="red" onClick={clearToken}>
+          Выйти
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
+/** Телефон: разделы — на весь экран, вкладки раскрываются списком; настройки — ⚙ в шапке. */
+function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; close: () => void }) {
+  const open = (hash: string) => {
+    go(hash);
+    close();
+  };
+  return (
+    <Drawer opened={opened} onClose={close} size="100%" title={<Text fw={700}>We Finance</Text>} hiddenFrom="sm">
+      <ScrollArea.Autosize mah="calc(100dvh - 80px)">
+        {MENU_TABS.map((tab) => {
+          const sections = tab.sections.filter((section) => !section.hidden);
+          if (sections.length === 1) {
+            return (
+              <NavLink
+                key={tab.id}
+                label={tab.label}
+                fw={600}
+                active={activeTab(route) === tab.id}
+                onClick={() => open(sectionHref(tab, sections[0]))}
+              />
+            );
+          }
+          return (
+          <NavLink key={tab.id} label={tab.label} defaultOpened={activeTab(route) === tab.id} childrenOffset={12} fw={600}>
+            {tab.sections
+              .filter((section) => !section.hidden)
+              .map((section) => (
+                <NavLink
+                  key={section.id}
+                  label={section.label}
+                  leftSection={section.icon}
+                  active={isActive(route, tab, section.id, section.link)}
+                  onClick={() => open(sectionHref(tab, section))}
+                />
+              ))}
+          </NavLink>
+          );
+        })}
+      </ScrollArea.Autosize>
+    </Drawer>
   );
 }
 
 export function Shell({ route, children }: { route: Route; children: ReactNode }) {
-  const status = useBackendStatus();
+  const [menuOpened, menu] = useDisclosure(false);
+  const screen = `${route.tab.id}/${route.section.id}`;
+  const withMonth = MONTH_SCREENS.has(screen);
+  const withYear = YEAR_SCREENS.has(screen);
+  // «Кино» тёмное в любой теме — шапка над ним тоже.
+  const stage = route.tab.id === 'home' && route.section.id === 'cinema';
 
   return (
-    <AppShell header={{ height: 72 }} navbar={{ width: 76, breakpoint: 0 }} padding="lg" className={classes.shell}>
-      <AppShell.Header className={classes.header}>
-        <Group h="100%" px="lg" justify="space-between" wrap="nowrap">
-          <Group gap="xs" wrap="nowrap">
-            <Box className={classes.logo}>WF</Box>
-            <Text fw={700} visibleFrom="xs">
-              We Finance
-            </Text>
+    <AppShell header={{ height: 64 }} padding="lg" className={classes.shell}>
+      <AppShell.Header className={classes.header} data-stage={stage || undefined}>
+        {/* Три зоны: меню слева, месяц по центру, ⚙ справа — на любой ширине. */}
+        <Box className={classes.bar} px={{ base: 'sm', sm: 'lg' }}>
+          <Group gap="xs" wrap="nowrap" className={classes.left}>
+            <Burger opened={menuOpened} onClick={menu.toggle} hiddenFrom="sm" size="sm" aria-label="Меню" />
+            <Box className={classes.logo} visibleFrom="sm" onClick={() => go(href('home'))}>
+              WF
+            </Box>
+            <Group gap={2} wrap="nowrap" visibleFrom="sm" ml="xs" className={classes.tabs}>
+              {MENU_TABS.map((tab) => (
+                <TabMenu key={tab.id} tab={tab} route={route} />
+              ))}
+            </Group>
           </Group>
-          <SegmentedControl
-            radius="xl"
-            size="sm"
-            value={route.tab.hidden ? '' : route.tab.id}
-            onChange={(value) => (window.location.hash = href(value as TabId))}
-            data={TABS.filter((tab) => !tab.hidden).map((tab) => ({ value: tab.id, label: tab.label }))}
-            className={classes.tabs}
-          />
-          <Group gap="xs" wrap="nowrap">
-            <StatusPill status={status} />
-            <Tooltip label="Система: состояние сервера">
-              <ActionIcon
-                variant={route.tab.id === 'system' ? 'light' : 'subtle'}
-                color="gray"
-                size="lg"
-                radius="xl"
-                onClick={() => (window.location.hash = href('system'))}
-                aria-label="Система"
-              >
-                <IconSettings size={18} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Выйти">
-              <ActionIcon variant="subtle" color="gray" size="lg" radius="xl" onClick={clearToken} aria-label="Выйти">
-                <IconLogout size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Group>
+          <Box className={classes.center}>
+            {withMonth && <HeaderMonth />}
+            {withYear && <HeaderYear />}
+          </Box>
+          <Box className={classes.right}>
+            <SettingsMenu route={route} />
+          </Box>
+        </Box>
       </AppShell.Header>
 
-      <AppShell.Navbar className={classes.rail}>
-        <Stack justify="space-between" h="100%" py="md" align="center">
-          <Stack gap={6} align="center">
-            {route.tab.sections.filter((section) => !section.hidden).map((section) => {
-              const active = section.id === route.section.id;
-              return (
-                <Tooltip key={section.id} label={section.label} position="right" withArrow>
-                  <UnstyledButton
-                    className={classes.railButton}
-                    data-active={active || undefined}
-                    onClick={() => (window.location.hash = href(route.tab.id, section.id))}
-                    aria-label={section.label}
-                  >
-                    {section.icon}
-                  </UnstyledButton>
-                </Tooltip>
-              );
-            })}
-          </Stack>
-          <ThemeToggle />
-        </Stack>
-      </AppShell.Navbar>
+      <MobileMenu route={route} opened={menuOpened} close={menu.close} />
 
       <AppShell.Main>
         <Box maw={1280} mx="auto">

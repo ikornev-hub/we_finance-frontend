@@ -45,3 +45,13 @@ export function ErrorAlert({ error }: { error: unknown }) {
     </Alert>
   );
 }
+
+/** Одна строка для уведомления: «поле: что не так» или текст ошибки. */
+export function errorText(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.offline) return 'Нет связи с бэкендом';
+    if (error.problems.length > 0) return error.problems.map((problem) => `${problem.where}: ${problem.message}`).join('; ');
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'Неизвестная ошибка';
+}

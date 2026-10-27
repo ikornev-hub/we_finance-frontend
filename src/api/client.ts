@@ -68,10 +68,16 @@ export async function request<T>(method: string, path: string, options: RequestO
     response = await fetch(path + toQueryString(options.query), {
       method,
       headers: {
-        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // FormData (загрузка файла) — заголовок с границей частей браузер ставит сам.
+        ...(options.body === undefined || options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
       },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body:
+        options.body === undefined
+          ? undefined
+          : options.body instanceof FormData
+            ? options.body
+            : JSON.stringify(options.body),
     });
   } catch {
     throw new ApiError(0, OFFLINE_MESSAGE, [], true);
@@ -112,4 +118,6 @@ export const api = {
   get: <T>(path: string, query?: Query) => request<T>('GET', path, { query }),
   post: <T>(path: string, body?: unknown, query?: Query) => request<T>('POST', path, { body, query }),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, { body }),
+  patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, { body }),
+  delete: <T>(path: string) => request<T>('DELETE', path),
 };

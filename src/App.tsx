@@ -1,6 +1,7 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
-import { HomePage } from './pages/HomePage';
+import { ExpensesPage, type ExpensesSection } from './pages/ExpensesPage';
+import { CinemaPage } from './pages/CinemaPage';
 import { LoginPage } from './pages/LoginPage';
 import { useToken } from './lib/session';
 import { CalculatorPage } from './pages/CalculatorPage';
@@ -29,11 +30,20 @@ function SignedIn() {
     case 'income':
       page = <IncomePage section={route.section.id as IncomeSection} />;
       break;
+    case 'expenses':
+      page = <ExpensesPage section={route.section.id as ExpensesSection} />;
+      break;
+    case 'goals':
+      page = <ExpensesPage section="goals" />;
+      break;
+    case 'accounts':
+      page = <ExpensesPage section="accounts" />;
+      break;
     case 'system':
       page = <ServicePage />;
       break;
     default:
-      page = <HomePage />;
+      page = <CinemaPage />;
   }
 
   // key: при смене раздела страница монтируется заново — без «застрявших» результатов прошлого раздела.

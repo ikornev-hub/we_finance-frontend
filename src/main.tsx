@@ -14,7 +14,7 @@ import { theme } from './theme';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    <MantineProvider theme={theme} defaultColorScheme="dark">
       <ModalsProvider>
         <Notifications position="top-right" />
         <App />

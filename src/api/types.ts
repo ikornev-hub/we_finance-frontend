@@ -222,3 +222,342 @@ export interface PreviewOut {
   months_saved: number;
   warnings: WarningOut[];
 }
+
+// ---------- Расходы (контракт: analysts/requirements/system/expenses.md §3) ----------
+
+export type OperationType =
+  | 'income'
+  | 'card'
+  | 'payment'
+  | 'transfer_own'
+  | 'transfer_credit'
+  | 'transfer_person'
+  | 'transfer_in';
+
+/** Остаток на счёте по дням: факт по выписке и ожидание по плану. */
+export interface BalanceView {
+  month: string;
+  today: IsoDate;
+  /** По какой день есть выписка. */
+  statement_until: IsoDate | null;
+  /** Остаток на конец предыдущего месяца; null — выписки нет. */
+  start_balance: Money | null;
+  actual: { day: IsoDate; balance: Money }[];
+  expected: { day: IsoDate; balance: Money }[];
+  /** Плановые доходы (+) и платежи (−) месяца в свои даты. */
+  events: { day: IsoDate; amount: Money; label: string }[];
+  spending: Money;
+}
+
+/** Новая операция выписки до сохранения: куда система её кладёт и почему. */
+export interface PreviewOperation {
+  bank_operation_id: string;
+  day: IsoDate;
+  amount: Money;
+  description: string;
+  merchant: string | null;
+  counterparty: string | null;
+  type: string;
+  category_id: string | null;
+  category: string | null;
+  /** «правило: …», «MCC 5411», «справочник: …», «перевод человеку — реши сам», «не распознано». */
+  reason: string;
+  can_remember: boolean;
+}
+
+/** Проверка выписки перед сохранением. */
+export interface ImportPreview {
+  period_from: IsoDate | null;
+  period_to: IsoDate | null;
+  total: number;
+  new: number;
+  duplicates: number;
+  operations: PreviewOperation[];
+}
+
+export interface ImportOverride {
+  bank_operation_id: string;
+  category_id: string;
+  remember: boolean;
+}
+
+export interface ImportResult {
+  import_id: string;
+  total: number;
+  new: number;
+  duplicates: number;
+  uncategorized: number;
+}
+
+export interface ExpenseOperation {
+  id: string;
+  operated_at: IsoDate;
+  amount: Money;
+  description: string;
+  merchant: string | null;
+  counterparty: string | null;
+  type: OperationType;
+  category_id: string | null;
+  category_path: string | null;
+}
+
+export interface ExpenseRule {
+  id: string;
+  match_kind: 'counterparty' | 'merchant';
+  pattern: string;
+  category_id: string;
+}
+
+export interface CategoryChange {
+  operation: ExpenseOperation;
+  rule: ExpenseRule | null;
+  /** Неразобранные операции, которые правило разложило сразу. */
+  applied: ExpenseOperation[];
+}
+
+/** Что будет, если «запомнить»: правило и операции, которые лягут туда же. null — нечего помнить (QR). */
+export interface RulePreview {
+  match_kind: 'counterparty' | 'merchant' | null;
+  pattern: string | null;
+  operations: ExpenseOperation[];
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  /** У подкатегории — id родителя; в дереве у верхнего уровня всегда null. */
+  parent_id?: string | null;
+  /** Группа (у верхнего уровня); null — «Служебные». */
+  group_id?: string | null;
+  system_code: string | null;
+  /** Граница — либо доля располагаемого, либо сумма; другое поле null. */
+  target_share: string | null;
+  target_amount?: Money | null;
+  children: { id: string; name: string }[];
+}
+
+export interface CategoryIn {
+  name: string;
+  parent_id?: string | null;
+  group_id?: string | null;
+  target_share?: string | null;
+  target_amount?: Money | null;
+}
+
+export type GroupCode = 'mandatory' | 'managed' | 'unmanaged' | 'purchases' | 'service';
+
+/** Группа трат: обязательные, управляемые, неуправляемые, покупки. */
+export interface ExpenseGroup {
+  id: string;
+  code: Exclude<GroupCode, 'service'>;
+  name: string;
+  target_share: string | null;
+  target_amount: Money | null;
+  category_ids: string[];
+}
+
+export interface GroupPatch {
+  name?: string;
+  target_share?: string | null;
+  target_amount?: Money | null;
+}
+
+export type AccountKind = 'own' | 'credit' | 'savings';
+
+export interface ExpenseAccount {
+  id: string;
+  bank: string;
+  name: string;
+  kind: AccountKind;
+  number_tail: string | null;
+  phone: string | null;
+  loan_id: string | null;
+  /** У накопительного счёта — его цель. */
+  goal_id?: string | null;
+}
+
+export type ExpenseAccountIn = Omit<ExpenseAccount, 'id'>;
+
+export interface MonthCategory {
+  id: string;
+  name: string;
+  system_code: string | null;
+  group_code: GroupCode;
+  amount: Money;
+  share: string | null;
+  /** Как задана граница: долей или суммой. */
+  limit_mode: 'share' | 'amount' | null;
+  target_share: string | null;
+  target: Money | null;
+  /** Факт − граница; > 0 — перерасход. */
+  deviation: Money | null;
+  /** Граница − факт: сколько ещё можно. */
+  remaining: Money | null;
+  children: { id: string; name: string; amount: Money; share: string | null }[];
+}
+
+/** Группа месяца: сумма её категорий, доля, граница и сами категории. */
+export interface MonthGroup {
+  id: string | null;
+  code: GroupCode;
+  name: string;
+  amount: Money;
+  /** У «Обязательных» — от дохода, у остальных — от располагаемого. */
+  share: string | null;
+  limit_mode: 'share' | 'amount' | null;
+  target_share: string | null;
+  target: Money | null;
+  deviation: Money | null;
+  remaining: Money | null;
+  categories: MonthCategory[];
+}
+
+/** Прогноз «план + факт»: от него доли и границы. */
+export interface MonthForecast {
+  income: Money;
+  /** Кредит, жильё, связь, близкие… — вычитаются из дохода. */
+  mandatory: Money;
+  /** Отложить на цели: «сначала себе». */
+  savings: Money;
+  disposable: Money;
+  spent: Money;
+  can_spend: Money;
+  limits_total: Money;
+  unallocated: Money;
+  /** Обязательные по категориям: кредит — по графику, жильё — по правилу (или факт, если больше). */
+  mandatory_by_category: Record<string, Money>;
+}
+
+export interface MonthReport {
+  month: string;
+  income: Money;
+  expenses: Money;
+  balance: Money;
+  disposable: Money;
+  uncategorized_count: number;
+  has_statement: boolean;
+  /** Отложено по факту: на накопительные счета и вручную. */
+  saved: Money;
+  /** Месяц закончился: прогноз = факт. */
+  closed: boolean;
+  warnings: string[];
+  forecast: MonthForecast;
+  groups: MonthGroup[];
+  categories: MonthCategory[];
+  /** Переводы себе — нейтральные: ушло на свои счета / пришло со своих. */
+  transfers_out: Money;
+  transfers_in: Money;
+  /** Прочие поступления: отдали долг, возврат — сверх трат категории. */
+  other_in: Money;
+}
+
+export type IncomeCheckStatus = 'confirmed' | 'mismatch' | 'missing' | 'no_statement' | 'expected';
+
+export interface IncomeCheck {
+  date: IsoDate;
+  kind: PaymentKind;
+  expected: Money;
+  status: IncomeCheckStatus;
+  operation_date: IsoDate | null;
+  operation_amount: Money | null;
+  difference: Money | null;
+}
+
+/** Цель накоплений на месяц: прогресс, план, реальный взнос, месяц достижения. */
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  target_amount: Money;
+  deadline: IsoDate | null;
+  monthly_amount: Money | null;
+  initial_amount: Money;
+  saved: Money;
+  saved_before_month: Money;
+  plan: Money;
+  /** Сколько реально откладывается: не хватает на все — пропорционально. */
+  contribution: Money;
+  /** Месяц достижения «2027-08» при реальном взносе; null — не достигается. */
+  eta: string | null;
+  account_tails: string[];
+  /** С какого числа копить; null — сразу. */
+  start_date: IsoDate | null;
+  /** Сколько положить в день аванса и остатка зарплаты в этом месяце. */
+  paydays: GoalPayday[];
+  /** Будущий месяц: «отложено» — ожидаемое к его началу (прошлые месяцы — сколько влезало в бюджет). */
+  projected: boolean;
+  /** Цель «закрыть кредит»: взносы — ЧДП по нему, «отложено» — на сколько уменьшился долг. */
+  loan_id: string | null;
+  /** Когда кредит закроется при таких ЧДП. */
+  closes_on: IsoDate | null;
+  /** Сколько процентов не уйдёт банку. */
+  interest_saved: Money | null;
+  note: string | null;
+}
+
+/** Цель «закрыть кредит» до сохранения. */
+export interface LoanGoalPreview {
+  debt: Money;
+  plan: Money;
+  paydays: GoalPayday[];
+  closes_on: IsoDate | null;
+  interest_saved: Money;
+  note: string | null;
+}
+
+export interface GoalPayday {
+  date: IsoDate;
+  kind: 'advance' | 'remainder';
+  amount: Money;
+}
+
+export interface SavingsGoalIn {
+  name: string;
+  target_amount: Money;
+  deadline?: IsoDate | null;
+  monthly_amount?: Money | null;
+  initial_amount?: Money;
+  start_date?: IsoDate | null;
+  loan_id?: string | null;
+}
+
+export interface ContributionIn {
+  day: IsoDate;
+  amount: Money;
+  comment?: string | null;
+}
+
+export interface AnalysisMonth {
+  month: string;
+  income: Money;
+  mandatory: Money;
+  saved: Money;
+  groups: Record<string, Money>;
+  categories: Record<string, Money>;
+}
+
+export interface AnalysisStat {
+  kind: 'group' | 'category';
+  id: string;
+  name: string;
+  group_code: GroupCode;
+  median: Money;
+  mean: Money;
+  max: Money;
+  max_month: string | null;
+}
+
+export interface PaceItem {
+  id: string;
+  name: string;
+  amount: Money;
+  projected: Money;
+  target: Money | null;
+}
+
+export interface SpendingAnalysis {
+  months: AnalysisMonth[];
+  stats: AnalysisStat[];
+  pace: { month: string; day: number; days: number; groups: PaceItem[]; categories: PaceItem[] } | null;
+  /** Закрытые месяцы, целиком покрытые выпиской: по ним медиана. */
+  full_months: string[];
+}
