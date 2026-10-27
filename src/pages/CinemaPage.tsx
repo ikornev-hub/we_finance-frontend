@@ -221,7 +221,8 @@ export function CinemaPage() {
   const next = shiftMonth(month, 1);
   const balanceNext = useLoad(() => expensesApi.balance(next), `cb/${next}`);
   const goalsNext = useLoad(() => expensesApi.goals(next), `cg/${next}`) ?? ([] as SavingsGoal[]);
-  const waiting = useLoad(() => expensesApi.operations({ uncategorized: true }).then((list) => list.length), 'cu');
+  // Тот же период, что у «Разобрать» и плашки на «Расходах»: выбранный месяц (#10).
+  const waiting = useLoad(() => expensesApi.operations({ uncategorized: true, month }).then((list) => list.length), `cu/${month}`);
   const categories = useLoad(() => expensesApi.categories(), 'cc');
   const loans = useLoad<LoanDetailOut[]>(async () => Promise.all((await loansApi.list()).map((loan) => loansApi.detail(loan.id))), 'cl');
   const [heroRef, heroIn] = useInView<HTMLDivElement>();
