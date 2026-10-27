@@ -108,7 +108,8 @@ export function Todo({ today, until, waiting, goals, loans }: { today: string; u
               <Group
                 key={task.key}
                 justify="space-between"
-                wrap="nowrap"
+                wrap="wrap"
+                gap="xs"
                 p={8}
                 style={{ borderRadius: 10, background: late ? 'var(--mantine-color-red-light)' : soon ? 'var(--mantine-color-orange-light)' : 'var(--mantine-color-default-hover)' }}
               >
@@ -119,7 +120,7 @@ export function Todo({ today, until, waiting, goals, loans }: { today: string; u
                     {late ? ' — просрочено' : ''}
                   </Text>
                 </Group>
-                <Button size="xs" variant={late || soon ? 'filled' : 'light'} color={late ? 'red' : soon ? 'orange' : undefined} onClick={task.onClick}>
+                <Button size="xs" ml="auto" variant={late || soon ? 'filled' : 'light'} color={late ? 'red' : soon ? 'orange' : undefined} onClick={task.onClick}>
                   {task.action}
                 </Button>
               </Group>
@@ -148,7 +149,7 @@ export function Upcoming({ today, events }: { today: string; events: BalanceView
               </Text>
               <Text size="sm">{event.label}</Text>
             </Group>
-            <Text size="sm" fw={600} c={Number(event.amount) > 0 ? 'teal' : undefined}>
+            <Text size="sm" fw={600} c={Number(event.amount) > 0 ? 'teal' : undefined} style={{ whiteSpace: 'nowrap' }}>
               {Number(event.amount) > 0 ? '+' : ''}
               {rub(Number(event.amount))}
             </Text>
