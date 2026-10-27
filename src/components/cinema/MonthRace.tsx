@@ -1,4 +1,5 @@
-import { Group, Stack, Text } from '@mantine/core';
+import { Group, SimpleGrid, Slider, Stack, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import type { BalanceView, ExpenseCategory, ExpenseOperation, MonthReport } from '../../api/types';
@@ -119,29 +120,37 @@ export function buildRace(report: MonthReport, balance: BalanceView, operations:
 const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 const thousands = (value: number) => (Math.abs(value) >= 1000 ? `${Math.round(value / 1000).toLocaleString('ru-RU')} тыс` : String(Math.round(value)));
 
-function RaceTooltip({ active, payload, label, month }: { active?: boolean; payload?: { payload: RacePoint }[]; label?: number; month: string }) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0].payload;
+const OF_MONTH = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const GOOD = '#9cff6b';
+const BAD = '#ff4d5e';
+
+/** Карточка метрики на выбранный день: план, факт и разница (зелёная — лучше плана). */
+function DayCard({ metric, point }: { metric: (typeof METRICS)[number]; point: RacePoint }) {
+  const plan = point[`${metric.key}Plan`];
+  const fact = point[`${metric.key}Fact`];
+  const diff = fact === null ? null : fact - plan;
+  // Расход: лучше — когда потратил меньше плана; остальное — когда больше.
+  const good = diff !== null && (metric.key === 'expense' ? diff <= 0 : diff >= 0);
   return (
-    <div style={{ background: 'rgba(8, 12, 20, 0.92)', border: '1px solid #2a3442', borderRadius: 8, padding: '8px 12px' }}>
-      <Text size="sm" fw={700} mb={4}>
-        {label} {month}
+    <div style={{ borderLeft: `3px solid ${metric.color}`, padding: '4px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+      <Text size="sm" fw={700} style={{ color: metric.color }}>
+        {metric.name}
       </Text>
-      {METRICS.map((metric) => {
-        const plan = point[`${metric.key}Plan`];
-        const fact = point[`${metric.key}Fact`];
-        return (
-          <Text key={metric.key} size="xs" style={{ color: metric.color, whiteSpace: 'nowrap' }}>
-            {metric.name}: план {rub(plan)}
-            {fact !== null && ` · факт ${rub(fact)} · ${fact - plan >= 0 ? '+' : '−'}${rub(Math.abs(fact - plan))}`}
-          </Text>
-        );
-      })}
+      <Text size="xs" c="dimmed">
+        план <span style={{ color: '#f2f5f7' }}>{rub(plan)}</span>
+      </Text>
+      <Text size="xs" c="dimmed">
+        факт <span style={{ color: '#f2f5f7' }}>{fact === null ? 'нет выписки' : rub(fact)}</span>
+      </Text>
+      {diff !== null && (
+        <Text size="xs" fw={700} style={{ color: good ? GOOD : BAD }}>
+          {diff >= 0 ? '+' : '−'}
+          {rub(Math.abs(diff))}
+        </Text>
+      )}
     </div>
   );
 }
-
-const OF_MONTH = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
 export function MonthRace({
   points,
@@ -160,8 +169,15 @@ export function MonthRace({
   height?: number | string;
 }) {
   const ofMonth = OF_MONTH[Number(month.slice(5, 7)) - 1];
+  const last = points.length;
+  const lastFact = points.reduce((max, point) => (point.incomeFact !== null ? point.day : max), 0);
+  // День по умолчанию: сегодня, у прошедшего месяца — последний день. Новый месяц — сброс.
+  const [day, setDay] = useState(today ?? last);
+  useEffect(() => setDay(today ?? last), [month, today, last]);
+  const point = points[Math.min(Math.max(day, 1), last) - 1];
+
   return (
-    <Stack gap="sm">
+    <Stack gap={8}>
       <Group gap="lg">
         {METRICS.map((metric) => (
           <Group key={metric.key} gap={6}>
@@ -176,12 +192,19 @@ export function MonthRace({
       <div style={{ width: '100%', height }}>
         {run && (
           <ResponsiveContainer>
-            <LineChart data={points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+            <LineChart
+              data={points}
+              margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
+              onClick={(state) => state?.activeLabel !== undefined && setDay(Number(state.activeLabel))}
+              style={{ cursor: 'pointer' }}
+            >
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis dataKey="day" stroke="#6b7685" tick={{ fontSize: 12 }} tickLine={false} interval="preserveStartEnd" />
               <YAxis stroke="#6b7685" tick={{ fontSize: 12 }} tickLine={false} tickFormatter={thousands} width={64} />
-              <Tooltip content={<RaceTooltip month={ofMonth} />} cursor={{ stroke: 'rgba(255,255,255,0.25)' }} />
-              {today !== null && <ReferenceLine x={today} stroke="#ffb547" strokeDasharray="2 4" label={{ value: 'сегодня', fill: '#ffb547', fontSize: 12, position: 'insideTopRight' }} />}
+              {/* Подсказки нет — всё под графиком; Tooltip нужен, чтобы клик знал день. */}
+              <Tooltip content={() => null} cursor={{ stroke: 'rgba(255,255,255,0.15)' }} />
+              {today !== null && today !== day && <ReferenceLine x={today} stroke="#ffb547" strokeOpacity={0.5} strokeDasharray="2 4" />}
+              <ReferenceLine x={day} stroke="#ffffff" strokeWidth={1.5} strokeOpacity={0.8} />
               {METRICS.map((metric) => (
                 <Line
                   key={`${metric.key}Plan`}
@@ -204,7 +227,7 @@ export function MonthRace({
                   stroke={metric.color}
                   strokeWidth={2.5}
                   dot={false}
-                  activeDot={{ r: 4 }}
+                  activeDot={false}
                   style={{ filter: `drop-shadow(0 0 4px ${metric.color})` }}
                   isAnimationActive={animate}
                 />
@@ -213,6 +236,32 @@ export function MonthRace({
           </ResponsiveContainer>
         )}
       </div>
+      <Slider
+        value={day}
+        onChange={setDay}
+        min={1}
+        max={last}
+        step={1}
+        color="cyan"
+        label={(value) => `${value} ${ofMonth}`}
+        marks={[{ value: 1, label: '1' }, ...(today !== null ? [{ value: today, label: 'сегодня' }] : []), { value: last, label: String(last) }]}
+        mx={72}
+        mb={18}
+        styles={{ markLabel: { color: '#6b7685', fontSize: 11 } }}
+        aria-label="День месяца"
+      />
+      <Text size="sm" fw={700}>
+        {point.day} {ofMonth}
+        <Text span size="xs" c="dimmed" fw={400}>
+          {' · '}
+          {lastFact === 0 ? 'выписки за месяц нет' : `факт по выписке до ${lastFact} ${ofMonth}`}
+        </Text>
+      </Text>
+      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
+        {METRICS.map((metric) => (
+          <DayCard key={metric.key} metric={metric} point={point} />
+        ))}
+      </SimpleGrid>
     </Stack>
   );
 }

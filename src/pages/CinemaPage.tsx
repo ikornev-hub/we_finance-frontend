@@ -282,7 +282,7 @@ export function CinemaPage() {
                     today={month === currentMonth() ? Number(balance.today.slice(8, 10)) : null}
                     run={heroIn}
                     animate={!reduced()}
-                    height="clamp(280px, calc(100vh - 460px), 460px)"
+                    height="clamp(200px, calc(100vh - 620px), 420px)"
                   />
                 </div>
               )}
