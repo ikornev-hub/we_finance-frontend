@@ -12,6 +12,7 @@ import { ErrorAlert, errorText } from '../ErrorAlert';
 import { monthTitle, shiftMonth, useSelectedMonth } from './common';
 import { isShare, limitPatch } from '../../lib/limits';
 import { ForecastBlock } from './ForecastBlock';
+import classes from './BudgetSection.module.css';
 
 // Пульт месяца: на что разложен доход (план) и сколько уже ушло (факт); границы трат
 // и взносы целей правятся здесь же — рублями в поле или ползунком в % располагаемого
@@ -90,6 +91,7 @@ function Amount({
   return (
     <Group gap="sm" wrap="nowrap" justify="flex-end">
       <Slider
+        visibleFrom="sm"
         w={160}
         min={0}
         max={100}
@@ -101,7 +103,7 @@ function Amount({
         disabled={disabled || base <= 0}
       />
       <NumberInput
-        w={130}
+        w={{ base: 104, sm: 130 }}
         size="xs"
         radius="md"
         value={value ?? ''}
@@ -282,7 +284,7 @@ export function BudgetSection() {
           </Group>
         }
       >
-        <Table verticalSpacing="xs" highlightOnHover>
+        <Table verticalSpacing="xs" highlightOnHover className={classes.ratio}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Статья</Table.Th>

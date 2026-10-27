@@ -51,7 +51,12 @@
   scrollbar-width: none;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
-  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
+@media (max-width: 75em) {
+  .tabs {
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
 }
 
 .tabs::-webkit-scrollbar {
@@ -87,10 +92,14 @@
   flex-shrink: 0;
 }
 
-/* Планшет: вкладки компактнее, чтобы влезли рядом с месяцем. */
+/* Вкладки компактные: шесть штук влезают в левую половину шапки; не влезают — листаются. */
+.tab {
+  padding-inline: 10px;
+  font-size: 14px;
+}
+
 @media (max-width: 62em) {
   .tab {
-    padding-inline: 10px;
     font-size: 13px;
   }
 }

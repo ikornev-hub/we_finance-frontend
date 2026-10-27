@@ -1,0 +1,9 @@
+/* Телефон: «Факт» (2-я) и «Доля» (3-я) прячутся — остаются статья (с полоской факта) и сумма в месяц. */
+@media (max-width: 48em) {
+  .ratio th:nth-child(2),
+  .ratio td:nth-child(2),
+  .ratio th:nth-child(3),
+  .ratio td:nth-child(3) {
+    display: none;
+  }
+}

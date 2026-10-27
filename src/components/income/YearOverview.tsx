@@ -214,12 +214,16 @@ function CheckSummary({ checks, year }: { checks: IncomeCheck[]; year: number })
       </Group>
       {big.length > 0 && (
         <ScrollArea>
-          <Table verticalSpacing={4} mt="md" fz="sm" miw={520}>
+          <Table verticalSpacing={4} mt="md" fz="sm" miw={{ base: 0, sm: 520 }}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Крупные расхождения (от {SMALL_DIFF} ₽)</Table.Th>
-                <Table.Th ta="right">Ждали</Table.Th>
-                <Table.Th ta="right">Пришло</Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  Ждали
+                </Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  Пришло
+                </Table.Th>
                 <Table.Th ta="right">Разница</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -235,9 +239,13 @@ function CheckSummary({ checks, year }: { checks: IncomeCheck[]; year: number })
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td ta="right">{money(check.expected)}</Table.Td>
-                  <Table.Td ta="right">{check.operation_amount === null ? 'не пришло' : money(check.operation_amount)}</Table.Td>
-                  <Table.Td ta="right" fw={700} c={Number(check.difference ?? -1) < 0 ? 'red' : 'teal'}>
+                  <Table.Td ta="right" visibleFrom="sm">
+                    {money(check.expected)}
+                  </Table.Td>
+                  <Table.Td ta="right" visibleFrom="sm">
+                    {check.operation_amount === null ? 'не пришло' : money(check.operation_amount)}
+                  </Table.Td>
+                  <Table.Td ta="right" fw={700} style={{ whiteSpace: 'nowrap' }} c={Number(check.difference ?? -1) < 0 ? 'red' : 'teal'}>
                     {signedMoney(check.difference ?? `-${check.expected}`)}
                   </Table.Td>
                 </Table.Tr>
@@ -300,18 +308,26 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
 
       <Panel title="По месяцам" subtitle="По месяцу, за который начислено, — как в расчётном листке. Клик по месяцу — его выплаты и сверка с выпиской.">
         <ScrollArea>
-          <Table verticalSpacing="xs" miw={(whatIf ? 900 : 720) + (withChecks ? 110 : 0)} highlightOnHover>
+          <Table verticalSpacing="xs" miw={{ base: 0, sm: (whatIf ? 900 : 720) + (withChecks ? 110 : 0) }} highlightOnHover>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Месяц</Table.Th>
-                <Table.Th ta="right">Начислено</Table.Th>
-                <Table.Th ta="right">НДФЛ</Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  Начислено
+                </Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  НДФЛ
+                </Table.Th>
                 <Table.Th ta="right">На руки</Table.Th>
                 {whatIf && <Table.Th ta="right">Станет</Table.Th>}
                 {whatIf && <Table.Th ta="right">Разница</Table.Th>}
-                {withChecks && <Table.Th ta="right">Δ выписка</Table.Th>}
-                <Table.Th>Выплаты</Table.Th>
-                <Table.Th w={8} />
+                {withChecks && (
+                  <Table.Th ta="right" visibleFrom="sm">
+                    Δ выписка
+                  </Table.Th>
+                )}
+                <Table.Th visibleFrom="sm">Выплаты</Table.Th>
+                <Table.Th w={8} visibleFrom="sm" />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -342,8 +358,10 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                           </Group>
                         </UnstyledButton>
                       </Table.Td>
-                      <Table.Td ta="right">{money(month.gross)}</Table.Td>
-                      <Table.Td ta="right" c="dimmed">
+                      <Table.Td ta="right" visibleFrom="sm">
+                        {money(month.gross)}
+                      </Table.Td>
+                      <Table.Td ta="right" c="dimmed" visibleFrom="sm">
                         {money(month.tax)}
                       </Table.Td>
                       <Table.Td ta="right">
@@ -354,6 +372,11 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                           <Box w={96} h={4} style={{ background: 'var(--mantine-color-default-border)', borderRadius: 2 }}>
                             <Box h={4} w={`${(Number(month.net) / maxNet) * 100}%`} bg="brand" style={{ borderRadius: 2, marginLeft: 'auto' }} />
                           </Box>
+                          {diff !== null && Math.abs(Number(diff)) >= 1 && (
+                            <Text size="xs" hiddenFrom="sm" c={Number(diff) < 0 ? 'red' : 'teal'}>
+                              выписка {signedMoney(diff)}
+                            </Text>
+                          )}
                         </Stack>
                       </Table.Td>
                       {whatIf && <Table.Td ta="right">{change ? money(change.net_after) : '—'}</Table.Td>}
@@ -363,18 +386,25 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                         </Table.Td>
                       )}
                       {withChecks && (
-                        <Table.Td ta="right" fw={600} c={diff === null || Math.abs(Number(diff)) < 1 ? 'dimmed' : Number(diff) < 0 ? 'red' : 'teal'}>
+                        <Table.Td
+                          visibleFrom="sm"
+                          ta="right"
+                          fw={600}
+                          fz={{ base: 'xs', sm: 'sm' }}
+                          style={{ whiteSpace: 'nowrap' }}
+                          c={diff === null || Math.abs(Number(diff)) < 1 ? 'dimmed' : Number(diff) < 0 ? 'red' : 'teal'}
+                        >
                           {diff === null ? '—' : signedMoney(diff)}
                         </Table.Td>
                       )}
-                      <Table.Td>
+                      <Table.Td visibleFrom="sm">
                         <Group gap={4}>
                           {payments.map((payment, index) => (
                             <PaymentChip key={index} payment={payment} />
                           ))}
                         </Group>
                       </Table.Td>
-                      <Table.Td />
+                      <Table.Td visibleFrom="sm" />
                     </Table.Tr>
                     {expanded &&
                       payments.map((payment, index) => (
@@ -384,10 +414,10 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                               {date(payment.date)} · {PAYMENT_KIND[payment.kind] ?? payment.kind}
                             </Text>
                           </Table.Td>
-                          <Table.Td ta="right">
+                          <Table.Td ta="right" visibleFrom="sm">
                             <Text size="xs">{money(payment.gross)}</Text>
                           </Table.Td>
-                          <Table.Td ta="right">
+                          <Table.Td ta="right" visibleFrom="sm">
                             <Text size="xs" c="dimmed">
                               {money(payment.tax)}
                             </Text>
@@ -399,8 +429,8 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                           </Table.Td>
                           {whatIf && <Table.Td />}
                           {whatIf && <Table.Td />}
-                          {withChecks && <Table.Td />}
-                          <Table.Td colSpan={2}>
+                          {withChecks && <Table.Td visibleFrom="sm" />}
+                          <Table.Td colSpan={2} visibleFrom="sm">
                             <Group gap={6} wrap="nowrap">
                               <PaymentStatusBadge status={payment.status} />
                               <StatementCheck check={checkOf(payment.date, payment.kind)} />
@@ -424,8 +454,12 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
             <Table.Tfoot>
               <Table.Tr>
                 <Table.Th>Итого за год</Table.Th>
-                <Table.Th ta="right">{money(report.gross)}</Table.Th>
-                <Table.Th ta="right">{money(report.tax)}</Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  {money(report.gross)}
+                </Table.Th>
+                <Table.Th ta="right" visibleFrom="sm">
+                  {money(report.tax)}
+                </Table.Th>
                 <Table.Th ta="right">{money(report.net)}</Table.Th>
                 {whatIf && <Table.Th ta="right">{money(whatIf.net_after)}</Table.Th>}
                 {whatIf && (
@@ -433,8 +467,8 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                     {signedMoney(whatIf.net_change)}
                   </Table.Th>
                 )}
-                {withChecks && <Table.Th />}
-                <Table.Th colSpan={2} />
+                {withChecks && <Table.Th visibleFrom="sm" />}
+                <Table.Th colSpan={2} visibleFrom="sm" />
               </Table.Tr>
             </Table.Tfoot>
           </Table>

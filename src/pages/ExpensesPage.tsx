@@ -181,7 +181,7 @@ function MonthSection() {
         <>
           <Panel
             title="Анализ трат"
-            subtitle={`Можно ещё потратить ${money(data.forecast.can_spend)} из располагаемых ${money(data.forecast.disposable)}. Пунктир — план (границы ровно по дням), линия — факт по выписке.`}
+            subtitle={`Можно ещё потратить ${money(data.forecast.can_spend)} из располагаемых ${money(data.forecast.disposable)}. План — границы ровно по дням.`}
           >
             {race ? (
               <MonthRace

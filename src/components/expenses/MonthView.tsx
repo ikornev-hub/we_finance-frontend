@@ -97,6 +97,17 @@ export function limitLabel(item: Limited): string {
   return `${percent(item.target_share)}${item.target ? ` (${money(item.target)})` : ''}`;
 }
 
+/** «ещё 5 000 ₽» / «перерасход 1 200 ₽» мелкой строкой — для телефона, где нет колонки «Можно ещё». */
+function RemainingLine({ item }: { item: Limited }) {
+  if (item.remaining === null) return null;
+  const over = Number(item.remaining) < 0;
+  return (
+    <Text size="xs" c={over ? 'red' : 'teal'} hiddenFrom="sm">
+      {over ? `перерасход ${money(String(-Number(item.remaining)))}` : `ещё ${money(item.remaining)}`}
+    </Text>
+  );
+}
+
 export function RemainingBadge({ category }: { category: Limited }) {
   if (category.remaining === null) return <>—</>;
   const over = Number(category.remaining) < 0;
@@ -177,8 +188,12 @@ export function MonthTree({
             <Table.Th ta="right" visibleFrom="sm">
               Доля
             </Table.Th>
-            <Table.Th ta="right">Граница</Table.Th>
-            <Table.Th ta="right">Можно ещё</Table.Th>
+            <Table.Th ta="right" visibleFrom="sm">
+              Граница
+            </Table.Th>
+            <Table.Th ta="right" visibleFrom="sm">
+              Можно ещё
+            </Table.Th>
             {paceOf && (
               <Table.Th ta="right" visibleFrom="sm">
                 Темп к концу месяца
@@ -207,11 +222,12 @@ export function MonthTree({
                           <Text size="sm" fw={700}>
                             {group.name}
                           </Text>
-                          <Text size="xs" c="dimmed">
+                          <Text size="xs" c="dimmed" visibleFrom="sm">
                             {GROUP_HINT[group.code]}
                           </Text>
                         </Group>
                         <Progress value={fill(group, groupMax)} size="xs" color={groupOver ? 'red' : group.target ? 'teal' : 'gray'} />
+                        <RemainingLine item={group} />
                       </Stack>
                     </Group>
                   </Table.Td>
@@ -221,10 +237,10 @@ export function MonthTree({
                   <Table.Td ta="right" fw={600} visibleFrom="sm">
                     {percent(group.share)}
                   </Table.Td>
-                  <Table.Td ta="right" c="dimmed">
+                  <Table.Td ta="right" c="dimmed" visibleFrom="sm">
                     {limitLabel(group)}
                   </Table.Td>
-                  <Table.Td ta="right">
+                  <Table.Td ta="right" visibleFrom="sm">
                     <RemainingBadge category={group} />
                   </Table.Td>
                   {paceOf && (
@@ -302,6 +318,7 @@ function CategoryRows({
                 )}
               </Group>
               <Progress value={fill(category, max)} size="xs" color={over ? 'red' : category.target ? 'teal' : 'brand'} />
+              <RemainingLine item={category} />
             </Stack>
           </Group>
         </Table.Td>
@@ -311,10 +328,10 @@ function CategoryRows({
         <Table.Td ta="right" visibleFrom="sm">
           {percent(category.share)}
         </Table.Td>
-        <Table.Td ta="right" c="dimmed">
+        <Table.Td ta="right" c="dimmed" visibleFrom="sm">
           {limitLabel(category)}
         </Table.Td>
-        <Table.Td ta="right">
+        <Table.Td ta="right" visibleFrom="sm">
           <RemainingBadge category={category} />
         </Table.Td>
         {paceOf && (
@@ -340,8 +357,8 @@ function CategoryRows({
             <Table.Td ta="right" visibleFrom="sm">
               {percent(child.share)}
             </Table.Td>
-            <Table.Td />
-            <Table.Td />
+            <Table.Td visibleFrom="sm" />
+            <Table.Td visibleFrom="sm" />
             {paceOf && <Table.Td visibleFrom="sm" />}
             {usualOf && <Table.Td visibleFrom="md" />}
           </Table.Tr>

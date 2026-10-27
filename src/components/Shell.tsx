@@ -195,7 +195,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
             <Box className={classes.logo} visibleFrom="sm" onClick={() => go(href('home'))}>
               WF
             </Box>
-            <Group gap={4} wrap="nowrap" visibleFrom="sm" ml="xs" className={classes.tabs}>
+            <Group gap={2} wrap="nowrap" visibleFrom="sm" ml="xs" className={classes.tabs}>
               {MENU_TABS.map((tab) => (
                 <TabMenu key={tab.id} tab={tab} route={route} />
               ))}

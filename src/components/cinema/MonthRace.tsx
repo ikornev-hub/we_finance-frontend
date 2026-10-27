@@ -325,7 +325,11 @@ export function MonthRace({
         step={1}
         color="cyan"
         label={(value) => `${value} ${ofMonth}`}
-        marks={[{ value: 1, label: '1' }, ...(today !== null ? [{ value: today, label: 'сегодня' }] : []), { value: last, label: String(last) }]}
+        marks={[
+          { value: 1, label: '1' },
+          ...(today !== null ? [{ value: today, label: 'сегодня' }] : []),
+          { value: last, label: today !== null && last - today < 5 ? '' : String(last) },
+        ]}
         mx={72}
         mb={18}
         styles={{ markLabel: { color: '#6b7685', fontSize: 11 } }}
