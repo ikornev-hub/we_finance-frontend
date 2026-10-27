@@ -28,6 +28,34 @@
   --burger-color: #f2f5f7;
 }
 
+/* Центр — ровно посередине экрана, сколько бы места ни заняли края. */
+.bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+/* Планшет и узкий десктоп: вкладкам не хватит половины ширины — месяц по центру свободного места. */
+@media (min-width: 48em) and (max-width: 75em) {
+  .bar {
+    grid-template-columns: auto 1fr auto;
+  }
+}
+
+.left {
+  min-width: 0;
+}
+
+.center {
+  justify-self: center;
+}
+
+.right {
+  justify-self: end;
+}
+
 .logo {
   display: flex;
   align-items: center;

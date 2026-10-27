@@ -23,7 +23,7 @@ import { MonthSwitch, useSelectedMonth } from './expenses/common';
 import classes from './Shell.module.css';
 
 // Шапка (решение заказчика 2026-10-27): левой колонки нет, разделы — выпадающий список вкладки,
-// на телефоне всё в бургере, в шапке — только бургер и месяц. Шапка прозрачная, контент едет под ней.
+// на телефоне разделы в бургере. Шапка: меню слева, месяц по центру, ⚙ справа. Шапка прозрачная, контент едет под ней.
 
 /** Экраны, которые показывают выбранный месяц: на них переключатель месяца висит в шапке. */
 const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'expenses/goals', 'expenses/review']);
@@ -111,9 +111,8 @@ function SettingsMenu({ route }: { route: Route }) {
   );
 }
 
-/** Телефон: всё меню — на весь экран, вкладки раскрываются списком разделов. */
+/** Телефон: разделы — на весь экран, вкладки раскрываются списком; настройки — ⚙ в шапке. */
 function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; close: () => void }) {
-  const theme = useTheme();
   const open = (hash: string) => {
     go(hash);
     close();
@@ -136,11 +135,6 @@ function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; c
               ))}
           </NavLink>
         ))}
-        <NavLink label="Настройки" childrenOffset={12} fw={600} defaultOpened={route.tab.id === 'system'}>
-          <NavLink label="Система" leftSection={<IconHeartbeat size={20} />} active={route.tab.id === 'system'} onClick={() => open(href('system'))} />
-          <NavLink label={theme.dark ? 'Светлая тема' : 'Тёмная тема'} leftSection={theme.dark ? <IconSun size={20} /> : <IconMoon size={20} />} onClick={theme.toggle} />
-          <NavLink label="Выйти" leftSection={<IconLogout size={20} />} c="red" onClick={clearToken} />
-        </NavLink>
       </ScrollArea.Autosize>
     </Drawer>
   );
@@ -155,8 +149,9 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
   return (
     <AppShell header={{ height: 64 }} padding="lg" className={classes.shell}>
       <AppShell.Header className={classes.header} data-stage={stage || undefined}>
-        <Group h="100%" px={{ base: 'sm', sm: 'lg' }} justify="space-between" wrap="nowrap" gap="sm">
-          <Group gap="xs" wrap="nowrap">
+        {/* Три зоны: меню слева, месяц по центру, ⚙ справа — на любой ширине. */}
+        <Box className={classes.bar} px={{ base: 'sm', sm: 'lg' }}>
+          <Group gap="xs" wrap="nowrap" className={classes.left}>
             <Burger opened={menuOpened} onClick={menu.toggle} hiddenFrom="sm" size="sm" aria-label="Меню" />
             <Box className={classes.logo} visibleFrom="sm" onClick={() => go(href('home'))}>
               WF
@@ -167,13 +162,11 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
               ))}
             </Group>
           </Group>
-          <Group gap="xs" wrap="nowrap">
-            {withMonth && <HeaderMonth />}
-            <Box visibleFrom="sm">
-              <SettingsMenu route={route} />
-            </Box>
-          </Group>
-        </Group>
+          <Box className={classes.center}>{withMonth && <HeaderMonth />}</Box>
+          <Box className={classes.right}>
+            <SettingsMenu route={route} />
+          </Box>
+        </Box>
       </AppShell.Header>
 
       <MobileMenu route={route} opened={menuOpened} close={menu.close} />
