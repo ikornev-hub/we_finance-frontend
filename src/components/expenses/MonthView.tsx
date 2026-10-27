@@ -46,10 +46,11 @@ export function ForecastPanel({ report }: { report: MonthReport }) {
   const rows: [string, string, string][] = [
     ['Доход', money(f.income), report.closed ? 'по выписке' : 'больше из: расчёт «Доходов» и факт по выписке'],
     ['− Обязательные', money(f.mandatory), names],
-    ['− Отложить на цели', money(f.savings), report.closed ? 'отложено по факту' : 'сначала себе: план целей (отложил больше — по факту)'],
     ['= Располагаемый', money(f.disposable), 'от него доли и границы'],
-    ['Потрачено', money(f.spent), 'всё, кроме обязательных'],
-    ['Границами распределено', money(f.limits_total), `не распределено ${money(f.unallocated)}`],
+    ['− Отложить на цели', money(f.savings), report.closed ? 'отложено по факту' : 'сначала себе: план целей (отложил больше — по факту)'],
+    ['− Потрачено', money(f.spent), 'всё, кроме обязательных'],
+    ['= Можно ещё', money(f.can_spend), report.closed ? 'осталось по итогам месяца' : 'до конца месяца'],
+    ['Границами распределено', money(f.limits_total), `не распределено ${money(f.unallocated)} (после целей)`],
   ];
   return (
     <Panel

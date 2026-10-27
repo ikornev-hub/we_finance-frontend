@@ -268,9 +268,10 @@ export function CinemaPage() {
   const data = report.data;
   const mood = useMemo(() => {
     if (!data) return 0.5;
-    const disposable = Number(data.forecast.disposable);
+    // Шкала — от свободного после целей: ничего не потратил — полная.
+    const free = Number(data.forecast.disposable) - Number(data.forecast.savings);
     const left = Number(data.forecast.can_spend);
-    return disposable <= 0 ? -1 : Math.max(-1, Math.min(1, left / disposable));
+    return free <= 0 ? -1 : Math.max(-1, Math.min(1, left / free));
   }, [data]);
 
   if (report.error) return <ErrorAlert error={report.error} />;

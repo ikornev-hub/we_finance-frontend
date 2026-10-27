@@ -399,9 +399,9 @@ function GoalForm({
   useEffect(() => {
     Promise.all([expensesApi.month(next), goalId ? expensesApi.goals(next) : Promise.resolve([])])
       .then(([report, goals]) => {
-        // При правке её собственный взнос уже вычтен из свободного — возвращаем, чтобы не считать дважды.
+        // При правке план этой цели уже вычтен из свободного — возвращаем его (план, не взнос: прогноз вычитает планы).
         const own = goals.find((item) => item.id === goalId);
-        setFree(Number(report.forecast.unallocated) + Number(own?.contribution ?? 0));
+        setFree(Number(report.forecast.unallocated) + Number(own?.plan ?? 0));
         setContributed(own ? Number(own.saved_before_month) - Number(own.initial_amount) : 0);
       })
       .catch(() => setFree(null));

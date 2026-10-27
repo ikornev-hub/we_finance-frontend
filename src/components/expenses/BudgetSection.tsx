@@ -31,7 +31,9 @@ const OF_MONTH = ['января', 'февраля', 'марта', 'апреля'
 const fromMonth = (month: string) => `${OF_MONTH[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 const pct = (value: number, base: number) => (base > 0 ? (value / base) * 100 : 0);
-const pctText = (value: number, base: number) => `${pct(value, base).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %`;
+/** База ≤ 0 — доли нет («—»), как `share = null` в API. */
+const pctText = (value: number, base: number) =>
+  base > 0 ? `${pct(value, base).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—';
 
 /** Черновик: id → сумма в месяц (null — без границы). */
 type Draft = Record<string, number | null>;
