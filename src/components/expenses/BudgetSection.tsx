@@ -12,7 +12,8 @@ import { ErrorAlert, errorText } from '../ErrorAlert';
 import { MonthSwitch, monthTitle, shiftMonth, useSelectedMonth } from './common';
 
 // Пульт месяца: на что разложен доход (план) и сколько уже ушло (факт); границы трат
-// и взносы целей правятся здесь же — рублями в поле или ползунком в % дохода.
+// и взносы целей правятся здесь же — рублями в поле или ползунком в % располагаемого
+// (доход − обязательные, решение заказчика 2026-10-27).
 
 const COLOR: Record<string, string> = {
   mandatory: 'gray.6',
@@ -68,16 +69,16 @@ function goalFinish(goal: SavingsGoal, monthly: number, month: string): string |
   return shiftMonth(start, Math.ceil(left / monthly) - 1);
 }
 
-/** Поле рублей + ползунок в % дохода. */
+/** Поле рублей + ползунок в % располагаемого. */
 function Amount({
   value,
-  income,
+  base,
   onChange,
   allowEmpty = true,
   disabled = false,
 }: {
   value: number | null;
-  income: number;
+  base: number;
   onChange: (value: number | null) => void;
   allowEmpty?: boolean;
   disabled?: boolean;
@@ -89,11 +90,11 @@ function Amount({
         min={0}
         max={100}
         step={0.5}
-        value={Math.min(pct(value ?? 0, income), 100)}
-        onChange={(share) => onChange(Math.round((income * share) / 100 / 100) * 100)}
+        value={Math.min(pct(value ?? 0, base), 100)}
+        onChange={(share) => onChange(Math.round((base * share) / 100 / 100) * 100)}
         label={(share) => `${share} %`}
         size="sm"
-        disabled={disabled || income <= 0}
+        disabled={disabled || base <= 0}
       />
       <NumberInput
         w={130}
@@ -139,6 +140,7 @@ export function BudgetSection() {
   const initial = initialDraft(data, goals);
   const income = Number(data.forecast.income);
   const mandatory = Number(data.forecast.mandatory);
+  const disposable = income - mandatory;
   const savings = goals.reduce((sum, goal) => sum + (draft.goals[goal.id] ?? 0), 0);
   const limitedGroups = data.groups.filter((group) => LIMITED.has(group.code));
   const takes = limitedGroups.map((group) => ({ group, take: groupTake(group, draft.groups, draft.categories) }));
@@ -248,7 +250,7 @@ export function BudgetSection() {
             <Text fw={700} size="xl" c={free < 0 ? 'red' : 'teal'}>
               {rub(free)}{' '}
               <Text span size="sm" c="dimmed">
-                ({pctText(free, income)})
+                ({pctText(free, disposable)} располагаемого)
               </Text>
             </Text>
           </Group>
@@ -262,7 +264,7 @@ export function BudgetSection() {
 
       <Panel
         title="Соотношение"
-        subtitle="Граница — сколько можно потратить за месяц. Ползунок — % дохода, поле — рубли. Границы общие для всех месяцев."
+        subtitle={`Граница — сколько можно потратить за месяц. Ползунок — % располагаемого (доход − обязательные = ${rub(disposable)}), поле — рубли. Границы общие для всех месяцев.`}
         actions={
           <Group gap="xs">
             <Button variant="default" size="xs" leftSection={<IconRefresh size={14} />} disabled={!dirty || saving} onClick={() => setDraft(initial)}>
@@ -279,14 +281,14 @@ export function BudgetSection() {
             <Table.Tr>
               <Table.Th>Статья</Table.Th>
               <Table.Th ta="right">Факт</Table.Th>
-              <Table.Th ta="right">Доля дохода</Table.Th>
+              <Table.Th ta="right">Доля</Table.Th>
               <Table.Th ta="right">Сколько в месяц</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {mandatoryGroup && (
               <>
-                <GroupRow name={mandatoryGroup.name} color={COLOR.mandatory} amount={Number(mandatoryGroup.amount)} share={pctText(mandatory, income)}>
+                <GroupRow name={mandatoryGroup.name} color={COLOR.mandatory} amount={Number(mandatoryGroup.amount)} share={`${pctText(mandatory, income)} дохода`}>
                   <Text size="sm" c="dimmed">
                     {rub(mandatory)} по плану
                   </Text>
@@ -319,8 +321,8 @@ export function BudgetSection() {
               const own = group.id ? draft.groups[group.id] : null;
               return (
                 <Fragment key={group.code}>
-                  <GroupRow name={group.name} color={COLOR[group.code]} amount={Number(group.amount)} share={pctText(take, income)} target={take}>
-                    {group.id && <Amount value={own ?? null} income={income} onChange={(value) => set('groups', group.id!, value)} />}
+                  <GroupRow name={group.name} color={COLOR[group.code]} amount={Number(group.amount)} share={pctText(take, disposable)} target={take}>
+                    {group.id && <Amount value={own ?? null} base={disposable} onChange={(value) => set('groups', group.id!, value)} />}
                     {own !== null && own !== undefined && (
                       <Text size="xs" c={inner > own ? 'orange' : 'dimmed'} ta="right">
                         {inner > own
@@ -342,11 +344,11 @@ export function BudgetSection() {
                       </Table.Td>
                       <Table.Td ta="right">
                         <Text size="sm" c="dimmed">
-                          {draft.categories[category.id] ? pctText(draft.categories[category.id]!, income) : '—'}
+                          {draft.categories[category.id] ? pctText(draft.categories[category.id]!, disposable) : '—'}
                         </Text>
                       </Table.Td>
                       <Table.Td>
-                        <Amount value={draft.categories[category.id] ?? null} income={income} onChange={(value) => set('categories', category.id, value)} />
+                        <Amount value={draft.categories[category.id] ?? null} base={disposable} onChange={(value) => set('categories', category.id, value)} />
                       </Table.Td>
                     </Table.Tr>
                   ))}
@@ -355,7 +357,7 @@ export function BudgetSection() {
             })}
 
             {goals.length > 0 && (
-              <GroupRow name="Цели" color={COLOR.goals} amount={Number(data.saved)} share={pctText(savings, income)} target={savings}>
+              <GroupRow name="Цели" color={COLOR.goals} amount={Number(data.saved)} share={pctText(savings, disposable)} target={savings}>
                 <Text size="sm" c="dimmed">
                   {rub(savings)} в месяц
                 </Text>
@@ -394,13 +396,13 @@ export function BudgetSection() {
                   </Table.Td>
                   <Table.Td ta="right">
                     <Text size="sm" c="dimmed">
-                      {pctText(monthly, income)}
+                      {pctText(monthly, disposable)}
                     </Text>
                   </Table.Td>
                   <Table.Td>
                     <Amount
                       value={monthly}
-                      income={income}
+                      base={disposable}
                       allowEmpty={false}
                       disabled={waits || fixedLoan}
                       onChange={(value) => set('goals', goal.id, value ?? 0)}
@@ -420,7 +422,7 @@ export function BudgetSection() {
               <Table.Td />
               <Table.Td ta="right">
                 <Text fw={600} c={free < 0 ? 'red' : undefined}>
-                  {pctText(free, income)}
+                  {pctText(free, disposable)}
                 </Text>
               </Table.Td>
               <Table.Td ta="right">
