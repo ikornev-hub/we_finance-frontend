@@ -16,7 +16,6 @@ import {
   IconHome,
   IconListDetails,
   IconMovie,
-  IconSparkles,
   IconUserEdit,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -63,7 +62,6 @@ export const TABS: Tab[] = [
     label: 'Доходы',
     sections: [
       { id: 'overview', label: 'Отчёт', icon: <IconChartBar size={size} /> },
-      { id: 'whatif', label: 'Что если', icon: <IconSparkles size={size} /> },
       { id: 'data', label: 'Мои данные', icon: <IconUserEdit size={size} />, hidden: true },
     ],
   },

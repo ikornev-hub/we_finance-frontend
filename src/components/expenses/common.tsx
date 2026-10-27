@@ -108,6 +108,12 @@ export function useSelectedMonth(): [string, (month: string) => void] {
   return [useSyncExternalStore(subscribeMonth, readMonth), setSelectedMonth];
 }
 
+/** Выбранный год — год выбранного месяца: один период на всё приложение. Смена года сохраняет месяц. */
+export function useSelectedYear(): [number, (year: number) => void] {
+  const [month, setMonth] = useSelectedMonth();
+  return [Number(month.slice(0, 4)), (year: number) => setMonth(`${year}-${month.slice(5, 7)}`)];
+}
+
 export function currentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -182,6 +188,80 @@ function MonthPicker({ month, onChange }: { month: string; onChange: (month: str
         </Button>
       </Popover.Dropdown>
     </Popover>
+  );
+}
+
+/** Кнопка с годом: по клику — 9 плиток лет (стрелки листают по 9) и «Текущий год». */
+function YearPicker({ year, onChange }: { year: number; onChange: (year: number) => void }) {
+  const [opened, setOpened] = useState(false);
+  const [from, setFrom] = useState(year - 4);
+  const now = new Date().getFullYear();
+  const pick = (next: number) => {
+    onChange(next);
+    setOpened(false);
+  };
+  return (
+    <Popover opened={opened} onChange={setOpened} position="bottom" shadow="lg" radius="md" withinPortal={false} trapFocus>
+      <Popover.Target>
+        <Button
+          variant="default"
+          size="sm"
+          miw={96}
+          onClick={() => {
+            setFrom(year - 4);
+            setOpened((value) => !value);
+          }}
+          aria-label="Выбрать год"
+        >
+          {year}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown p="sm" w={232}>
+        <Group justify="space-between" mb="xs">
+          <ActionIcon variant="subtle" color="gray" onClick={() => setFrom(from - 9)} aria-label="Раньше">
+            <IconChevronLeft size={16} />
+          </ActionIcon>
+          <Text fw={700}>
+            {from} – {from + 8}
+          </Text>
+          <ActionIcon variant="subtle" color="gray" onClick={() => setFrom(from + 9)} aria-label="Позже">
+            <IconChevronRight size={16} />
+          </ActionIcon>
+        </Group>
+        <SimpleGrid cols={3} spacing={6}>
+          {Array.from({ length: 9 }, (_, index) => from + index).map((value) => (
+            <Button
+              key={value}
+              size="md"
+              px={0}
+              variant={value === year ? 'filled' : value === now ? 'outline' : 'subtle'}
+              color={value === year || value === now ? 'brand' : 'gray'}
+              onClick={() => pick(value)}
+              aria-pressed={value === year}
+            >
+              {value}
+            </Button>
+          ))}
+        </SimpleGrid>
+        <Button variant="light" color="gray" fullWidth mt="sm" onClick={() => pick(now)} disabled={year === now}>
+          Текущий год
+        </Button>
+      </Popover.Dropdown>
+    </Popover>
+  );
+}
+
+export function YearSwitch({ year, onChange }: { year: number; onChange: (year: number) => void }) {
+  return (
+    <Group gap={4} wrap="nowrap">
+      <Button variant="default" size="sm" px={8} onClick={() => onChange(year - 1)} aria-label="Предыдущий год">
+        <IconChevronLeft size={16} />
+      </Button>
+      <YearPicker year={year} onChange={onChange} />
+      <Button variant="default" size="sm" px={8} onClick={() => onChange(year + 1)} aria-label="Следующий год">
+        <IconChevronRight size={16} />
+      </Button>
+    </Group>
   );
 }
 

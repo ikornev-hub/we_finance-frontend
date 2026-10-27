@@ -19,7 +19,7 @@ import type { ReactNode } from 'react';
 
 import { clearToken } from '../lib/session';
 import { type Route, type Tab, TABS, href, sectionHref } from '../navigation';
-import { MonthSwitch, useSelectedMonth } from './expenses/common';
+import { MonthSwitch, YearSwitch, useSelectedMonth, useSelectedYear } from './expenses/common';
 import classes from './Shell.module.css';
 
 // Шапка (решение заказчика 2026-10-27): левой колонки нет, разделы — выпадающий список вкладки,
@@ -31,9 +31,17 @@ const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'e
 const MENU_TABS = TABS.filter((tab) => !tab.hidden);
 const go = (hash: string) => (window.location.hash = hash);
 
+/** Экраны, которые показывают год: в шапке — переключатель года (год выбранного месяца). */
+const YEAR_SCREENS = new Set(['income/overview']);
+
 function HeaderMonth() {
   const [month, setMonth] = useSelectedMonth();
   return <MonthSwitch month={month} onChange={setMonth} />;
+}
+
+function HeaderYear() {
+  const [year, setYear] = useSelectedYear();
+  return <YearSwitch year={year} onChange={setYear} />;
 }
 
 /** Подсвеченная вкладка шапки: у скрытой (калькулятор) — её родитель. */
@@ -142,7 +150,9 @@ function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; c
 
 export function Shell({ route, children }: { route: Route; children: ReactNode }) {
   const [menuOpened, menu] = useDisclosure(false);
-  const withMonth = MONTH_SCREENS.has(`${route.tab.id}/${route.section.id}`);
+  const screen = `${route.tab.id}/${route.section.id}`;
+  const withMonth = MONTH_SCREENS.has(screen);
+  const withYear = YEAR_SCREENS.has(screen);
   // «Кино» тёмное в любой теме — шапка над ним тоже.
   const stage = route.tab.id === 'home' && route.section.id === 'cinema';
 
@@ -162,7 +172,10 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
               ))}
             </Group>
           </Group>
-          <Box className={classes.center}>{withMonth && <HeaderMonth />}</Box>
+          <Box className={classes.center}>
+            {withMonth && <HeaderMonth />}
+            {withYear && <HeaderYear />}
+          </Box>
           <Box className={classes.right}>
             <SettingsMenu route={route} />
           </Box>

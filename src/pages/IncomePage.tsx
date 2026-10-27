@@ -1,11 +1,10 @@
-import { Alert, Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Menu, Modal, Select, Stack, Switch, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconArrowLeft,
   IconBeach,
-  IconChevronLeft,
-  IconChevronRight,
+  IconChevronDown,
   IconDeviceFloppy,
   IconInfoCircle,
   IconRefresh,
@@ -16,24 +15,21 @@ import { useEffect, useState } from 'react';
 
 import { ApiError } from '../api/client';
 import { expensesApi, salaryApi } from '../api/endpoints';
-import { SampleNotice } from '../components/expenses/common';
+import { SampleNotice, useSelectedYear } from '../components/expenses/common';
 import { SAMPLE_INCOME_CHECK } from '../lib/expenseSamples';
 import { useOrSample } from '../lib/sample';
 import type { Absence, AbsenceKind, SalaryProfile, SalaryTerms, WhatIfOut, YearReportOut } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { DateField, IntField, MoneyField } from '../components/fields';
+import { DateField, MoneyField } from '../components/fields';
 import { YearOverview } from '../components/income/YearOverview';
 import { ProfileEditor } from '../components/salary/ProfileEditor';
-import { WhatIfView } from '../components/salary/ReportView';
 import { confirmAction, notifyDone } from '../lib/confirm';
 import { EXAMPLE_PROFILE, EXAMPLE_WHAT_IF, clone } from '../lib/examples';
 import { ABSENCE_KIND, date, signedMoney, todayIso } from '../lib/format';
 import { useAction } from '../lib/useAction';
 
-export type IncomeSection = 'overview' | 'whatif' | 'data';
-
-const THIS_YEAR = new Date().getFullYear();
+export type IncomeSection = 'overview' | 'data';
 
 const go = (section: IncomeSection) => () => (window.location.hash = `#income/${section}`);
 
@@ -41,8 +37,6 @@ export function IncomePage({ section }: { section: IncomeSection }) {
   switch (section) {
     case 'data':
       return <DataSection />;
-    case 'whatif':
-      return <WhatIfSection />;
     default:
       return <OverviewSection />;
   }
@@ -73,39 +67,47 @@ function ReportError({ error }: { error: unknown }) {
   return isNoProfile(error) ? <NoDataNotice /> : <ErrorAlert error={error} />;
 }
 
-function YearSwitch({ year, onChange }: { year: number; onChange: (year: number) => void }) {
-  return (
-    <Group gap={4}>
-      <Button variant="default" size="sm" px={8} onClick={() => onChange(year - 1)} aria-label="Предыдущий год">
-        <IconChevronLeft size={16} />
-      </Button>
-      <Button variant="default" size="sm" miw={72}>
-        {year}
-      </Button>
-      <Button variant="default" size="sm" px={8} onClick={() => onChange(year + 1)} aria-label="Следующий год">
-        <IconChevronRight size={16} />
-      </Button>
-    </Group>
-  );
-}
-
 // ---------- главная: отчёт ----------
 
+/** 1-е число следующего месяца: «2026-11-01». */
+function nextMonthStart(): string {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
 function OverviewSection() {
-  const [year, setYear] = useState(THIS_YEAR);
+  const [year] = useSelectedYear();
   const report = useAction<YearReportOut>();
   const { run, reset } = report;
   const [absenceOpen, absenceModal] = useDisclosure(false);
   const checks = useOrSample(() => expensesApi.incomeCheck(year), SAMPLE_INCOME_CHECK, String(year));
+  const [whatIfOn, setWhatIfOn] = useState(false);
+  const [terms, setTerms] = useState<SalaryTerms>(clone(EXAMPLE_WHAT_IF));
+  const whatIf = useAction<WhatIfOut>();
+  const resetWhatIf = whatIf.reset;
 
   useEffect(() => {
     reset(); // другой год: старый отчёт не показываем, даже если новый не загрузится (#9)
+    resetWhatIf();
     void run(() => salaryApi.year(year));
-  }, [run, reset, year]);
+  }, [run, reset, resetWhatIf, year]);
+
+  // «Что если» стартует с текущих условий с 1-го числа следующего месяца; пример — только без профиля (#16).
+  useEffect(() => {
+    salaryApi
+      .getProfile()
+      .then((profile) => {
+        const current = [...profile.terms].sort((a, b) => a.start.localeCompare(b.start)).at(-1);
+        if (current) setTerms({ start: nextMonthStart(), salary: current.salary, meal_per_day: current.meal_per_day });
+      })
+      .catch(() => undefined);
+  }, []);
 
   const afterAbsence = async (before: string | null) => {
     absenceModal.close();
     const updated = await run(() => salaryApi.year(year));
+    resetWhatIf();
     if (updated && before !== null) {
       const change = (Math.round(Number(updated.net) * 100) - Math.round(Number(before) * 100)) / 100;
       notifications.show({
@@ -117,26 +119,68 @@ function OverviewSection() {
     }
   };
 
+  const toggleWhatIf = (on: boolean) => {
+    setWhatIfOn(on);
+    if (!on) resetWhatIf();
+  };
+
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
-        <PageHeader title="Доходы" subtitle="Сколько и когда приходит: зарплата, отпускные, больничные — за вычетом НДФЛ." />
-        <Group gap="sm">
-          <YearSwitch year={year} onChange={setYear} />
-          <Button variant="default" leftSection={<IconBeach size={16} />} onClick={absenceModal.open} disabled={!report.data}>
-            Отпуск или больничный
-          </Button>
-          <Button variant="default" leftSection={<IconSparkles size={16} />} onClick={go('whatif')}>
-            Что если
-          </Button>
-          <Button leftSection={<IconRefresh size={16} />} onClick={go('data')}>
-            Актуализировать данные
-          </Button>
+        <PageHeader title={`Доходы ${year}`} subtitle="Сколько и когда приходит: зарплата, отпускные, больничные — за вычетом НДФЛ." />
+        <Group gap="md">
+          <Switch
+            label="Что если"
+            checked={whatIfOn}
+            onChange={(event) => toggleWhatIf(event.currentTarget.checked)}
+            disabled={!report.data}
+            thumbIcon={<IconSparkles size={10} />}
+          />
+          <Menu position="bottom-end" radius="md" shadow="lg">
+            <Menu.Target>
+              <Button leftSection={<IconUserEdit size={16} />} rightSection={<IconChevronDown size={14} />}>
+                Мои данные
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconBeach size={16} />} onClick={absenceModal.open} disabled={!report.data}>
+                Отпуск, больничный, день без оплаты
+              </Menu.Item>
+              <Menu.Item leftSection={<IconRefresh size={16} />} onClick={go('data')}>
+                Условия работы и выплаты до учёта
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Group>
+      {whatIfOn && (
+        <Panel>
+          <Group align="flex-end" gap="md">
+            <DateField label="Новые условия с" value={terms.start} onChange={(start) => setTerms({ ...terms, start })} />
+            <MoneyField label="Оклад" value={terms.salary} width={170} onChange={(salary) => setTerms({ ...terms, salary })} />
+            <MoneyField
+              label="Питание в день"
+              value={terms.meal_per_day}
+              width={150}
+              onChange={(meal_per_day) => setTerms({ ...terms, meal_per_day })}
+            />
+            <Button leftSection={<IconSparkles size={16} />} loading={whatIf.loading} onClick={() => whatIf.run(() => salaryApi.whatIf(year, terms))}>
+              Посчитать
+            </Button>
+          </Group>
+          <Text size="xs" c="dimmed" mt="xs">
+            Новые условия с даты — сколько станет на руки за {year}. Ничего не сохраняет: результат — колонками «Станет» и «Разница».
+          </Text>
+          {whatIf.error !== null && (
+            <Stack mt="md">
+              <ReportError error={whatIf.error} />
+            </Stack>
+          )}
+        </Panel>
+      )}
       <ReportError error={report.error} />
-      {checks.sample && report.data && <SampleNotice what="Колонка «Выписка» в выплатах" />}
-      {report.data && <YearOverview report={report.data} checks={checks.data ?? undefined} />}
+      {checks.sample && report.data && <SampleNotice what="Сверка выплат с выпиской" />}
+      {report.data && <YearOverview report={report.data} checks={checks.data ?? undefined} whatIf={whatIfOn ? whatIf.data : null} />}
       <Modal opened={absenceOpen} onClose={absenceModal.close} title="Отпуск, больничный или день без оплаты" radius="lg" centered>
         <AbsenceForm netBefore={report.data?.net ?? null} onDone={afterAbsence} />
       </Modal>
@@ -261,65 +305,6 @@ function DataSection() {
           </Stack>
         </Panel>
       )}
-    </Stack>
-  );
-}
-
-// ---------- что если ----------
-
-/** 1-е число следующего месяца: «2026-11-01». */
-function nextMonthStart(): string {
-  const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
-}
-
-function WhatIfSection() {
-  const [year, setYear] = useState(THIS_YEAR);
-  const [terms, setTerms] = useState<SalaryTerms>(clone(EXAMPLE_WHAT_IF));
-  const result = useAction<WhatIfOut>();
-
-  // Старт — текущие условия из профиля с 1-го числа следующего месяца; пример — только без профиля (#16).
-  useEffect(() => {
-    salaryApi
-      .getProfile()
-      .then((profile) => {
-        const current = [...profile.terms].sort((a, b) => a.start.localeCompare(b.start)).at(-1);
-        if (current) setTerms({ start: nextMonthStart(), salary: current.salary, meal_per_day: current.meal_per_day });
-      })
-      .catch(() => undefined);
-  }, []);
-
-  return (
-    <Stack gap="lg">
-      <Group>
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={go('overview')}>
-          К отчёту
-        </Button>
-      </Group>
-      <PageHeader title="Что если" subtitle="Новые условия с даты — сколько станет на руки. Ничего не сохраняет." />
-      <Panel>
-        <Group align="flex-end" gap="md">
-          <IntField label="Год" value={year} min={2000} max={2100} width={110} onChange={setYear} />
-          <DateField label="Новые условия с" value={terms.start} onChange={(start) => setTerms({ ...terms, start })} />
-          <MoneyField label="Оклад" value={terms.salary} width={170} onChange={(salary) => setTerms({ ...terms, salary })} />
-          <MoneyField
-            label="Питание в день"
-            value={terms.meal_per_day}
-            width={150}
-            onChange={(meal_per_day) => setTerms({ ...terms, meal_per_day })}
-          />
-          <Button leftSection={<IconSparkles size={16} />} loading={result.loading} onClick={() => result.run(() => salaryApi.whatIf(year, terms))}>
-            Посчитать
-          </Button>
-        </Group>
-        {result.error !== null && (
-          <Stack mt="md">
-            <ReportError error={result.error} />
-          </Stack>
-        )}
-      </Panel>
-      {result.data && <WhatIfView result={result.data} />}
     </Stack>
   );
 }
