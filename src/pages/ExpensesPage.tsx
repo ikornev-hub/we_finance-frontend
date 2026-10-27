@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  Collapse,
   Group,
   Modal,
   NumberInput,
@@ -14,31 +15,36 @@ import {
   Text,
   TextInput,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconArrowLeft,
   IconArrowsMove,
   IconCheck,
+  IconChevronDown,
+  IconChevronRight,
   IconInfoCircle,
   IconListSearch,
   IconPlus,
   IconTrash,
   IconUpload,
 } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
-import { CategorySelect, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
+import { CategorySelect, SampleNotice, categoryOptions, currentMonth, monthTitle, shiftMonth, useSelectedMonth } from '../components/expenses/common';
+import { GROUP_METRICS, MonthRace, buildGroupRace } from '../components/cinema/MonthRace';
 import { AnalysisSection } from '../components/expenses/AnalysisSection';
 import { BudgetSection } from '../components/expenses/BudgetSection';
 import { GoalsSection } from '../components/expenses/GoalsSection';
 import { ImportSection } from '../components/expenses/ImportSection';
-import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
+import { ForecastPanel, GROUP_HINT, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
   SAMPLE_ACCOUNTS,
@@ -47,7 +53,7 @@ import {
   SAMPLE_UNCATEGORIZED,
   sampleOperations,
 } from '../lib/expenseSamples';
-import { date, money } from '../lib/format';
+import { date, money, todayIso } from '../lib/format';
 import { notImplemented, useOrSample } from '../lib/sample';
 import { useAction } from '../lib/useAction';
 
@@ -118,50 +124,135 @@ function useCategories() {
 function MonthSection() {
   const [month] = useSelectedMonth();
   const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
+  const [howOpen, how] = useDisclosure(false);
   useEffect(() => setPicked(null), [month]);
   const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);
+  const balance = useLoadValue(() => expensesApi.balance(month), `balance/${month}`);
+  const operations = useLoadValue(() => expensesApi.operations({ month }), `operations/${month}`);
+  const categories = useCategories();
+  const analysis = useLoadValue(() => expensesApi.analysis(shiftMonth(month, -6), shiftMonth(month, -1)), `usual/${month}`);
+  const data = report.data;
+
+  const race = useMemo(
+    () =>
+      data && balance && operations && categories.data && balance.month === month && !report.sample
+        ? buildGroupRace(data, balance, operations, categories.data)
+        : null,
+    [data, balance, operations, categories.data, month, report.sample],
+  );
+
+  // Темп к концу месяца — только у текущего месяца и только у трат, которые идут каждый день (не обязательные).
+  const days = Number(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate());
+  const until = balance?.statement_until ?? null;
+  const elapsed = until && until.slice(0, 7) === month ? Number(until.slice(8, 10)) : 0;
+  const mandatoryIds = new Set((data?.groups.find((group) => group.code === 'mandatory')?.categories ?? []).map((category) => category.id));
+  const amountOf = new Map<string, number>([
+    ...(data?.groups ?? []).map((group) => [group.code as string, Number(group.amount)] as const),
+    ...(data?.categories ?? []).map((category) => [category.id, Number(category.amount)] as const),
+  ]);
+  const paceOf =
+    month === currentMonth() && elapsed > 0 && elapsed < days
+      ? (key: string) => (key === 'mandatory' || mandatoryIds.has(key) || !amountOf.has(key) ? null : (amountOf.get(key)! * days) / elapsed)
+      : undefined;
+  const usual = new Map((analysis?.stats ?? []).map((stat) => [stat.id, Number(stat.median)]));
+  const usualOf = analysis?.full_months.length ? (key: string) => usual.get(key) ?? null : undefined;
 
   return (
     <Stack gap="lg">
-      <Group justify="space-between" align="flex-start">
-        <PageHeader title="Расходы" subtitle="Куда ушли деньги за месяц: категории, доли от располагаемого дохода, цели и перерасход." />
-        <Group gap="sm">
-          <Button variant="subtle" onClick={go('categories')}>
-            Категории
-          </Button>
-          <Button variant="subtle" onClick={go('budget')}>
-            Бюджет и границы
-          </Button>
-          <Button variant="subtle" onClick={go('analysis')}>
-            Анализ
-          </Button>
-          <Button variant="default" leftSection={<IconUpload size={16} />} onClick={go('import')}>
-            Загрузить выписку
-          </Button>
-        </Group>
-      </Group>
+      <PageHeader title="Расходы" subtitle="Куда уходят деньги в этом месяце и сколько ещё можно потратить." />
       {report.sample && <SampleNotice what={`Месяц ${monthTitle(month)}`} />}
       <ErrorAlert error={report.error} />
-      {report.data && (
+      {data && data.uncategorized_count > 0 && (
+        <Alert color="orange" radius="lg" variant="light" icon={<IconListSearch size={18} />} title={`Без категории: ${data.uncategorized_count}`}>
+          <Group justify="space-between">
+            <Text size="sm">Уточни категорию — система запомнит получателя, и в следующем месяце такие операции разложатся сами.</Text>
+            <Button size="xs" color="orange" variant="light" onClick={go('review')}>
+              Уточнить
+            </Button>
+          </Group>
+        </Alert>
+      )}
+      <Group>
+        <Button leftSection={<IconUpload size={16} />} onClick={go('import')}>
+          Загрузить выписку
+        </Button>
+      </Group>
+      {data && (
         <>
-          <MonthTotals report={report.data} />
-          {report.data.uncategorized_count > 0 && (
-            <Alert color="orange" radius="lg" variant="light" icon={<IconListSearch size={18} />} title={`Без категории: ${report.data.uncategorized_count}`}>
-              <Group justify="space-between">
-                <Text size="sm">Разбери их — система запомнит получателя, и в следующем месяце они разложатся сами.</Text>
-                <Button size="xs" color="orange" variant="light" onClick={go('review')}>
-                  Разобрать
+          <Panel
+            title="Анализ трат"
+            subtitle={`Можно ещё потратить ${money(data.forecast.can_spend)} из располагаемых ${money(data.forecast.disposable)}. Пунктир — план (границы ровно по дням), линия — факт по выписке.`}
+          >
+            {race ? (
+              <MonthRace
+                points={race}
+                metrics={GROUP_METRICS}
+                month={month}
+                today={month === currentMonth() ? Number(todayIso().slice(8, 10)) : null}
+                run
+                animate={false}
+                height="clamp(220px, 40vh, 380px)"
+              />
+            ) : (
+              <Text size="sm" c="dimmed">
+                {report.sample ? 'График появится с первой выпиской.' : 'Загружаю…'}
+              </Text>
+            )}
+            <UnstyledButton mt="sm" onClick={how.toggle}>
+              <Group gap={4}>
+                {howOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                <Text size="sm" c="dimmed">
+                  Как посчитано «можно ещё»
+                </Text>
+              </Group>
+            </UnstyledButton>
+            <Collapse in={howOpen}>
+              <ForecastPanel report={data} />
+            </Collapse>
+          </Panel>
+          <MonthTree
+            report={data}
+            onPick={(id, title) => setPicked({ id, title })}
+            title="Траты по категориям"
+            subtitle="Клик по группе — свернуть, по категории — подкатегории, по подкатегории — операции и перенос."
+            paceOf={paceOf}
+            usualOf={usualOf}
+            actions={
+              <Group gap={4}>
+                <Button size="xs" variant="subtle" onClick={go('categories')}>
+                  Категории
+                </Button>
+                <Button size="xs" variant="subtle" onClick={go('budget')}>
+                  Бюджет и границы
+                </Button>
+                <Button size="xs" variant="subtle" onClick={go('analysis')}>
+                  Динамика
                 </Button>
               </Group>
-            </Alert>
-          )}
-          <ForecastPanel report={report.data} />
-          <MonthTree report={report.data} onPick={(id, title) => setPicked({ id, title })} />
+            }
+          />
           {picked && <CategoryOperations month={month} categoryId={picked.id} title={picked.title} onChanged={report.reload} />}
         </>
       )}
     </Stack>
   );
+}
+
+/** Загрузка без «примера»: null, пока нет ответа или при ошибке. */
+function useLoadValue<T>(fn: () => Promise<T>, key: string): T | null {
+  const [value, setValue] = useState<T | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setValue(null);
+    fn()
+      .then((next) => alive && setValue(next))
+      .catch(() => alive && setValue(null));
+    return () => {
+      alive = false;
+    };
+    // перезагрузка — по ключу
+  }, [key]);
+  return value;
 }
 
 /** Операции категории месяца; перенос операции пересчитывает и сам месяц (onChanged). */

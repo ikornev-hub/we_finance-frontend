@@ -4,6 +4,8 @@
   margin: calc(var(--mantine-spacing-lg) * -1);
   min-height: 100vh;
   color: #f2f5f7;
+  --race-text: #f2f5f7;
+  --race-card: rgba(255, 255, 255, 0.03);
 }
 
 /* фон на весь экран, под меню — как сцена в кинотеатре */

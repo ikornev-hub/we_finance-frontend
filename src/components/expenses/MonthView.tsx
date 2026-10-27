@@ -1,5 +1,6 @@
 import { Badge, Group, Progress, SimpleGrid, Stack, Table, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconArrowDownRight, IconArrowUpRight, IconChevronDown, IconChevronRight, IconScale, IconWallet } from '@tabler/icons-react';
+import type { ReactNode } from 'react';
 import { Fragment, useState } from 'react';
 
 import type { MonthCategory, MonthGroup, MonthReport } from '../../api/types';
@@ -122,8 +123,39 @@ export const GROUP_HINT: Record<MonthGroup['code'], string> = {
   service: 'не статья трат: перекладывание и ещё не разобранное',
 };
 
+/** Темп к концу месяца и «обычно» (медиана): по коду группы или id категории; null — нечего показать. */
+type Extra = (key: string) => number | null;
+
+/** Темп против границы: красный — к концу месяца выйдет за границу. */
+function PaceCell({ pace, target }: { pace: number | null; target: string | null }) {
+  if (pace === null) return <Text size="sm" c="dimmed">—</Text>;
+  const over = target !== null && pace > Number(target);
+  return (
+    <Text size="sm" c={over ? 'red' : undefined} fw={over ? 600 : undefined}>
+      {money(pace.toFixed(2))}
+      {over ? ' ⚠' : ''}
+    </Text>
+  );
+}
+
 /** Группы → категории → подкатегории: факт ₽ и %, граница, сколько ещё можно. Клик по категории — её операции. */
-export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (categoryId: string, title: string) => void }) {
+export function MonthTree({
+  report,
+  onPick,
+  title = 'Куда ушли деньги',
+  subtitle = 'Группы → категории → подкатегории. Нажми на группу — свернуть; на категорию — подкатегории; на подкатегорию — операции',
+  actions,
+  paceOf,
+  usualOf,
+}: {
+  report: MonthReport;
+  onPick?: (categoryId: string, title: string) => void;
+  title?: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  paceOf?: Extra;
+  usualOf?: Extra;
+}) {
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (set: Set<string>, id: string) => {
@@ -136,15 +168,27 @@ export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (c
   const groupMax = Math.max(...report.groups.map((group) => Number(group.amount)), 1);
 
   return (
-    <Panel title="Куда ушли деньги" subtitle="Группы → категории → подкатегории. Нажми на группу — свернуть; на категорию — подкатегории; на подкатегорию — операции">
+    <Panel title={title} subtitle={subtitle} actions={actions}>
       <Table verticalSpacing="xs" highlightOnHover>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Группа / категория</Table.Th>
             <Table.Th ta="right">Факт</Table.Th>
-            <Table.Th ta="right">Доля</Table.Th>
+            <Table.Th ta="right" visibleFrom="sm">
+              Доля
+            </Table.Th>
             <Table.Th ta="right">Граница</Table.Th>
             <Table.Th ta="right">Можно ещё</Table.Th>
+            {paceOf && (
+              <Table.Th ta="right" visibleFrom="sm">
+                Темп к концу месяца
+              </Table.Th>
+            )}
+            {usualOf && (
+              <Table.Th ta="right" visibleFrom="md">
+                Обычно
+              </Table.Th>
+            )}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -174,7 +218,7 @@ export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (c
                   <Table.Td ta="right" fw={700} style={{ whiteSpace: 'nowrap' }}>
                     {money(group.amount)}
                   </Table.Td>
-                  <Table.Td ta="right" fw={600}>
+                  <Table.Td ta="right" fw={600} visibleFrom="sm">
                     {percent(group.share)}
                   </Table.Td>
                   <Table.Td ta="right" c="dimmed">
@@ -183,6 +227,16 @@ export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (c
                   <Table.Td ta="right">
                     <RemainingBadge category={group} />
                   </Table.Td>
+                  {paceOf && (
+                    <Table.Td ta="right" visibleFrom="sm">
+                      <PaceCell pace={paceOf(group.code)} target={group.target} />
+                    </Table.Td>
+                  )}
+                  {usualOf && (
+                    <Table.Td ta="right" visibleFrom="md" c="dimmed">
+                      {usualOf(group.code) === null ? '—' : money(usualOf(group.code)!.toFixed(2))}
+                    </Table.Td>
+                  )}
                 </Table.Tr>
                 {groupOpen &&
                   group.categories.map((category) => (
@@ -193,6 +247,8 @@ export function MonthTree({ report, onPick }: { report: MonthReport; onPick?: (c
                       expanded={open.has(category.id)}
                       onToggle={() => setOpen((prev) => toggle(prev, category.id))}
                       onPick={onPick}
+                      paceOf={paceOf}
+                      usualOf={usualOf}
                     />
                   ))}
               </Fragment>
@@ -215,13 +271,18 @@ function CategoryRows({
   expanded,
   onToggle,
   onPick,
+  paceOf,
+  usualOf,
 }: {
   category: MonthCategory;
   max: number;
   expanded: boolean;
   onToggle: () => void;
   onPick?: (categoryId: string, title: string) => void;
+  paceOf?: Extra;
+  usualOf?: Extra;
 }) {
+  const usual = usualOf?.(category.id) ?? null;
   const over = category.remaining !== null && Number(category.remaining) < 0;
   return (
     <>
@@ -247,13 +308,25 @@ function CategoryRows({
         <Table.Td ta="right" fw={600} style={{ whiteSpace: 'nowrap' }}>
           {money(category.amount)}
         </Table.Td>
-        <Table.Td ta="right">{percent(category.share)}</Table.Td>
+        <Table.Td ta="right" visibleFrom="sm">
+          {percent(category.share)}
+        </Table.Td>
         <Table.Td ta="right" c="dimmed">
           {limitLabel(category)}
         </Table.Td>
         <Table.Td ta="right">
           <RemainingBadge category={category} />
         </Table.Td>
+        {paceOf && (
+          <Table.Td ta="right" visibleFrom="sm">
+            <PaceCell pace={paceOf(category.id)} target={category.target} />
+          </Table.Td>
+        )}
+        {usualOf && (
+          <Table.Td ta="right" visibleFrom="md" c="dimmed">
+            {usual === null ? '—' : money(usual.toFixed(2))}
+          </Table.Td>
+        )}
       </Table.Tr>
       {expanded &&
         category.children.map((child) => (
@@ -264,9 +337,13 @@ function CategoryRows({
             <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
               {money(child.amount)}
             </Table.Td>
-            <Table.Td ta="right">{percent(child.share)}</Table.Td>
+            <Table.Td ta="right" visibleFrom="sm">
+              {percent(child.share)}
+            </Table.Td>
             <Table.Td />
             <Table.Td />
+            {paceOf && <Table.Td visibleFrom="sm" />}
+            {usualOf && <Table.Td visibleFrom="md" />}
           </Table.Tr>
         ))}
     </>
