@@ -10,6 +10,7 @@ import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert, errorText } from '../ErrorAlert';
 import { monthTitle, shiftMonth, useSelectedMonth } from './common';
+import { isShare, limitPatch } from '../../lib/limits';
 
 // Пульт месяца: на что разложен доход (план) и сколько уже ушло (факт); границы трат
 // и взносы целей правятся здесь же — рублями в поле или ползунком в % располагаемого
@@ -170,9 +171,12 @@ export function BudgetSection() {
   const save = async () => {
     setSaving(true);
     try {
-      for (const id of changed('groups')) await expensesApi.updateGroup(id, { target_amount: draft.groups[id]?.toFixed(2) ?? null, target_share: null });
+      // Граница остаётся в том виде, в каком была: доля — долей, сумма — суммой (#24).
+      const shareGroups = new Set(data.groups.filter(isShare).map((group) => group.id));
+      const shareCategories = new Set(data.categories.filter(isShare).map((category) => category.id));
+      for (const id of changed('groups')) await expensesApi.updateGroup(id, limitPatch(draft.groups[id] ?? null, shareGroups.has(id), disposable));
       for (const id of changed('categories'))
-        await expensesApi.updateCategory(id, { target_amount: draft.categories[id]?.toFixed(2) ?? null, target_share: null });
+        await expensesApi.updateCategory(id, limitPatch(draft.categories[id] ?? null, shareCategories.has(id), disposable));
       for (const id of changed('goals')) {
         const goal = goals.find((item) => item.id === id)!;
         const monthly = draft.goals[id] ?? 0;

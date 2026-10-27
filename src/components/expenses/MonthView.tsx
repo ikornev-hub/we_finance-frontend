@@ -50,7 +50,7 @@ export function ForecastPanel({ report }: { report: MonthReport }) {
     ['− Отложить на цели', money(f.savings), report.closed ? 'отложено по факту' : 'сначала себе: план целей (отложил больше — по факту)'],
     ['− Потрачено', money(f.spent), 'всё, кроме обязательных'],
     ['= Можно ещё', money(f.can_spend), report.closed ? 'осталось по итогам месяца' : 'до конца месяца'],
-    ['Границами распределено', money(f.limits_total), `не распределено ${money(f.unallocated)} (после целей)`],
+    ['Границами распределено', money(f.limits_total), `свободно ${money(f.unallocated)} (после целей и границ)`],
   ];
   return (
     <Panel

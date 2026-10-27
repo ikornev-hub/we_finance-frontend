@@ -105,7 +105,7 @@ export function GoalsSection() {
               {money(plan.toFixed(2))}
             </Text>
           </Panel>
-          <Panel title="Реально получается" subtitle="Доход − обязательные − границы трат">
+          <Panel title="Реально уходит в цели" subtitle="Сумма взносов этого месяца: на все планы не хватает — делится пропорционально">
             <Text size="xl" fw={700} c={short ? 'orange' : 'teal'}>
               {money(real.toFixed(2))}
             </Text>

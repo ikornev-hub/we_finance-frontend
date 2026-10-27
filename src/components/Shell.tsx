@@ -26,7 +26,7 @@ import classes from './Shell.module.css';
 // на телефоне разделы в бургере. Шапка: меню слева, месяц по центру, ⚙ справа. Шапка прозрачная, контент едет под ней.
 
 /** Экраны, которые показывают выбранный месяц: на них переключатель месяца висит в шапке. */
-const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'goals/main', 'expenses/review']);
+const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'goals/main', 'expenses/review', 'expenses/analysis']);
 
 const MENU_TABS = TABS.filter((tab) => !tab.hidden);
 const go = (hash: string) => (window.location.hash = hash);

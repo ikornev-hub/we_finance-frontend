@@ -9,7 +9,7 @@ import type { MonthReport, SavingsGoal, SpendingAnalysis } from '../../api/types
 import { useOrSample } from '../../lib/sample';
 import { Panel } from '../Cards';
 import { errorText } from '../ErrorAlert';
-import { currentMonth, monthTitle, shiftMonth } from './common';
+import { monthTitle, shiftMonth, useSelectedMonth } from './common';
 
 // Прогноз на 3 месяца по месяцам (Решение 2026-10-27):
 // - траты по категориям — медиана последних 6 полных месяцев выписки;
@@ -62,7 +62,7 @@ interface Row {
 }
 
 export function ForecastBlock() {
-  const current = currentMonth();
+  const [current] = useSelectedMonth();
   const months = useMemo(() => Array.from({ length: HORIZON }, (_, index) => shiftMonth(current, index + 1)), [current]);
   const data = useOrSample(
     () => expensesApi.analysis(shiftMonth(current, -6), current),

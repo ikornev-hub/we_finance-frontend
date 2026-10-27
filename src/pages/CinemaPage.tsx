@@ -9,6 +9,7 @@ import { currentMonth, monthTitle, useSelectedMonth } from '../components/expens
 import { date } from '../lib/format';
 import { useOrSample } from '../lib/sample';
 import { MonthRace, buildRace } from '../components/cinema/MonthRace';
+import { groupLimit } from '../lib/limits';
 import classes from './CinemaPage.module.css';
 
 // «Кино» — стартовая страница (решение заказчика 2026-10-27, референс — промо «Хоум кредит таргет» Студии Лебедева):
@@ -295,7 +296,7 @@ export function CinemaPage() {
                   {data.groups
                     .filter((group) => ['managed', 'unmanaged', 'purchases'].includes(group.code) && group.categories.length)
                     .map((group) => {
-                      const limit = group.target !== null ? Number(group.target) : null;
+                      const limit = groupLimit(group);
                       return (
                         <Stack key={group.code} gap={10}>
                           <NeonBar label={group.name} spent={Number(group.amount)} limit={limit} run={visible} strong />

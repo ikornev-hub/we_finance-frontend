@@ -8,7 +8,7 @@ import { money } from '../../lib/format';
 import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert } from '../ErrorAlert';
-import { currentMonth, monthTitle, shiftMonth } from './common';
+import { monthTitle, shiftMonth, useSelectedMonth } from './common';
 import { ForecastBlock } from './ForecastBlock';
 
 const chartMoney = (value: number) => `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`;
@@ -34,7 +34,7 @@ function spike(amount: number, stat: AnalysisStat | undefined): boolean {
 /** Анализ трат: динамика групп и категорий, медиана и выбросы, темп текущего месяца. */
 export function AnalysisSection() {
   const [period, setPeriod] = useState('6');
-  const to = currentMonth();
+  const [to] = useSelectedMonth();
   const from = shiftMonth(to, -(Number(period) - 1));
   const data = useOrSample(() => expensesApi.analysis(from, to), EMPTY, `${from}/${to}`);
   const analysis = data.data ?? EMPTY;

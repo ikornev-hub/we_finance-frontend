@@ -9,6 +9,7 @@ import type { BalanceView, LoanDetailOut, MonthGroup, MonthReport, SavingsGoal, 
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { currentMonth, monthTitle, shiftMonth, useSelectedMonth } from '../components/expenses/common';
+import { groupLimit } from '../lib/limits';
 import { date, todayIso } from '../lib/format';
 import { useOrSample } from '../lib/sample';
 
@@ -348,8 +349,7 @@ function Spending({ report, until, analysis, month }: { report: MonthReport; unt
   const warnings = report.categories
     .filter((category) => category.target !== null && (medians.get(category.id) ?? 0) > Number(category.target))
     .map((category) => `${category.name} обычно ${rub(medians.get(category.id) ?? 0)} > граница ${rub(Number(category.target))}`);
-  const take = (group: MonthGroup) =>
-    group.target !== null ? Number(group.target) : group.categories.some((c) => c.target !== null) ? group.categories.reduce((sum, c) => sum + Number(c.target ?? 0), 0) : null;
+  const take = (group: MonthGroup) => groupLimit(group);
   return (
     <Panel
       title="Траты"
