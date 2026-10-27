@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, NumberInput, Progress, Slider, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { Alert, Badge, Button, Group, NumberInput, Progress, SegmentedControl, Slider, Stack, Table, Text, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconAlertTriangle, IconDeviceFloppy, IconRefresh } from '@tabler/icons-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -41,6 +41,16 @@ const pctText = (value: number, base: number) =>
 /** Черновик: id → сумма в месяц (null — без границы). */
 type Draft = Record<string, number | null>;
 
+/** Как сейчас хранится каждая граница: доля или сумма (новая — суммой). */
+function initialModes(report: MonthReport): Record<string, 'share' | 'amount'> {
+  const modes: Record<string, 'share' | 'amount'> = {};
+  for (const group of report.groups) {
+    if (group.id) modes[group.id] = isShare(group) ? 'share' : 'amount';
+    for (const category of group.categories) modes[category.id] = isShare(category) ? 'share' : 'amount';
+  }
+  return modes;
+}
+
 function initialDraft(report: MonthReport, goals: SavingsGoal[]): { groups: Draft; categories: Draft; goals: Draft } {
   const groups: Draft = {};
   const categories: Draft = {};
@@ -74,20 +84,28 @@ function goalFinish(goal: SavingsGoal, monthly: number, month: string): string |
   return shiftMonth(start, Math.ceil(left / monthly) - 1);
 }
 
-/** Поле рублей + ползунок в % располагаемого. */
+/** Как хранится граница: долей располагаемого (идёт за доходом) или суммой. */
+type Mode = 'share' | 'amount';
+
+/** Поле рублей (или % располагаемого) + ползунок в %; у границ — переключатель «₽ / %». */
 function Amount({
   value,
   base,
   onChange,
   allowEmpty = true,
   disabled = false,
+  mode,
+  onMode,
 }: {
   value: number | null;
   base: number;
   onChange: (value: number | null) => void;
   allowEmpty?: boolean;
   disabled?: boolean;
+  mode?: Mode;
+  onMode?: (mode: Mode) => void;
 }) {
+  const asShare = mode === 'share' && base > 0;
   return (
     <Group gap="sm" wrap="nowrap" justify="flex-end">
       <Slider
@@ -103,19 +121,35 @@ function Amount({
         disabled={disabled || base <= 0}
       />
       <NumberInput
-        w={{ base: 104, sm: 130 }}
+        w={{ base: 92, sm: 120 }}
         size="xs"
         radius="md"
-        value={value ?? ''}
+        value={value === null ? '' : asShare ? Math.round((value / base) * 1000) / 10 : value}
         placeholder={allowEmpty ? 'нет' : '0'}
         min={0}
-        step={1000}
+        max={asShare ? 100 : undefined}
+        step={asShare ? 0.5 : 1000}
         thousandSeparator=" "
-        decimalScale={0}
-        suffix=" ₽"
+        decimalScale={asShare ? 1 : 0}
+        suffix={asShare ? ' %' : ' ₽'}
         disabled={disabled}
-        onChange={(next) => onChange(next === '' ? (allowEmpty ? null : 0) : Number(next))}
+        onChange={(next) =>
+          onChange(next === '' ? (allowEmpty ? null : 0) : asShare ? Math.round((base * Number(next)) / 100) : Number(next))
+        }
       />
+      {mode && onMode && (
+        <SegmentedControl
+          size="xs"
+          value={mode}
+          onChange={(next) => onMode(next as Mode)}
+          data={[
+            { value: 'amount', label: '₽' },
+            { value: 'share', label: '%' },
+          ]}
+          disabled={disabled || base <= 0}
+          aria-label="Граница в рублях или в процентах располагаемого"
+        />
+      )}
     </Group>
   );
 }
@@ -135,9 +169,13 @@ export function BudgetSection() {
   const goals = useMemo(() => goalsData.data ?? [], [goalsData.data]);
 
   const [draft, setDraft] = useState<{ groups: Draft; categories: Draft; goals: Draft } | null>(null);
+  const [modes, setModes] = useState<Record<string, Mode>>({});
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    if (data) setDraft(initialDraft(data, goals));
+    if (data) {
+      setDraft(initialDraft(data, goals));
+      setModes(initialModes(data));
+    }
   }, [data, goals]);
 
   if (report.error) return <ErrorAlert error={report.error} />;
@@ -154,7 +192,13 @@ export function BudgetSection() {
   const free = income - mandatory - savings - limits;
   const mandatoryGroup = data.groups.find((group) => group.code === 'mandatory');
 
-  const changed = (kind: 'groups' | 'categories' | 'goals') => Object.keys(draft[kind]).filter((id) => draft[kind][id] !== initial[kind][id]);
+  const startModes = initialModes(data);
+  const changed = (kind: 'groups' | 'categories' | 'goals') =>
+    Object.keys(draft[kind]).filter(
+      (id) => draft[kind][id] !== initial[kind][id] || (kind !== 'goals' && draft[kind][id] !== null && modes[id] !== startModes[id]),
+    );
+  const modeOf = (id: string): Mode => modes[id] ?? 'amount';
+  const setMode = (id: string, mode: Mode) => setModes({ ...modes, [id]: mode });
   const dirty = changed('groups').length + changed('categories').length + changed('goals').length;
   const set = (kind: 'groups' | 'categories' | 'goals', id: string, value: number | null) => setDraft({ ...draft, [kind]: { ...draft[kind], [id]: value } });
 
@@ -174,12 +218,10 @@ export function BudgetSection() {
   const save = async () => {
     setSaving(true);
     try {
-      // Граница остаётся в том виде, в каком была: доля — долей, сумма — суммой (#24).
-      const shareGroups = new Set(data.groups.filter(isShare).map((group) => group.id));
-      const shareCategories = new Set(data.categories.filter(isShare).map((category) => category.id));
-      for (const id of changed('groups')) await expensesApi.updateGroup(id, limitPatch(draft.groups[id] ?? null, shareGroups.has(id), disposable));
+      // Граница хранится в выбранной форме: «%» — долей располагаемого (идёт за доходом), «₽» — суммой (#24).
+      for (const id of changed('groups')) await expensesApi.updateGroup(id, limitPatch(draft.groups[id] ?? null, modeOf(id) === 'share', disposable));
       for (const id of changed('categories'))
-        await expensesApi.updateCategory(id, limitPatch(draft.categories[id] ?? null, shareCategories.has(id), disposable));
+        await expensesApi.updateCategory(id, limitPatch(draft.categories[id] ?? null, modeOf(id) === 'share', disposable));
       for (const id of changed('goals')) {
         const goal = goals.find((item) => item.id === id)!;
         const monthly = draft.goals[id] ?? 0;
@@ -330,7 +372,15 @@ export function BudgetSection() {
               return (
                 <Fragment key={group.code}>
                   <GroupRow name={group.name} color={COLOR[group.code]} amount={Number(group.amount)} share={pctText(take, disposable)} target={take}>
-                    {group.id && <Amount value={own ?? null} base={disposable} onChange={(value) => set('groups', group.id!, value)} />}
+                    {group.id && (
+                      <Amount
+                        value={own ?? null}
+                        base={disposable}
+                        onChange={(value) => set('groups', group.id!, value)}
+                        mode={modeOf(group.id)}
+                        onMode={(mode) => setMode(group.id!, mode)}
+                      />
+                    )}
                     {own !== null && own !== undefined && (
                       <Text size="xs" c={inner > own ? 'orange' : 'dimmed'} ta="right">
                         {inner > own
@@ -356,7 +406,13 @@ export function BudgetSection() {
                         </Text>
                       </Table.Td>
                       <Table.Td>
-                        <Amount value={draft.categories[category.id] ?? null} base={disposable} onChange={(value) => set('categories', category.id, value)} />
+                        <Amount
+                          value={draft.categories[category.id] ?? null}
+                          base={disposable}
+                          onChange={(value) => set('categories', category.id, value)}
+                          mode={modeOf(category.id)}
+                          onMode={(mode) => setMode(category.id, mode)}
+                        />
                       </Table.Td>
                     </Table.Tr>
                   ))}

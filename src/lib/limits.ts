@@ -19,9 +19,14 @@ export function limitPatch(
   disposable: number,
 ): { target_share: string | null; target_amount: string | null } {
   if (amount === null) return { target_share: null, target_amount: null };
-  if (wasShare && disposable > 0) return { target_share: Math.min(amount / disposable, 1).toFixed(4), target_amount: null };
+  // Доля — не больше 100 % располагаемого (так в API); граница больше располагаемого остаётся суммой, без потерь.
+  if (wasShare && disposable > 0 && amount <= disposable) return { target_share: (amount / disposable).toFixed(4), target_amount: null };
   return { target_share: null, target_amount: amount.toFixed(2) };
 }
 
-/** Задана ли граница долей. */
-export const isShare = (item: Pick<MonthGroup | MonthCategory, 'target_share'>) => item.target_share !== null;
+/**
+ * Задана ли граница долей. В отчёте месяца `target_share` есть у любой границы (сумма тоже пересчитана в долю),
+ * как задана — говорит `limit_mode`; в справочнике категорий заполнено только одно из полей.
+ */
+export const isShare = (item: Pick<MonthGroup | MonthCategory, 'target_share'> & { limit_mode?: 'share' | 'amount' | null }) =>
+  item.limit_mode !== undefined ? item.limit_mode === 'share' : item.target_share !== null;
