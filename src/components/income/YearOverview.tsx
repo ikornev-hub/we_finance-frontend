@@ -154,6 +154,107 @@ function StatementCheck({ check }: { check: IncomeCheck | undefined }) {
   );
 }
 
+/** Копеечные расхождения — известное округление, их сворачиваем в одну строку. */
+const SMALL_DIFF = 100;
+
+/** Расчёт против выписки за год: суммы по прошедшим выплатам, счётчики, крупные расхождения. */
+function CheckSummary({ checks, year }: { checks: IncomeCheck[]; year: number }) {
+  // «Прошло»: пришло (ровно или нет) и не найдено при наличии выписки. Будущие и без выписки — не в суммах.
+  const past = checks.filter((check) => ['confirmed', 'mismatch', 'missing'].includes(check.status));
+  if (past.length === 0) return null;
+  const expected = sum(past.map((check) => check.expected));
+  const received = sum(past.map((check) => check.operation_amount ?? '0'));
+  const difference = sum([received, `-${expected}`]);
+  const count = (status: IncomeCheck['status']) => checks.filter((check) => check.status === status).length;
+  const mismatches = checks.filter((check) => check.status === 'mismatch');
+  const big = [
+    ...mismatches.filter((check) => Math.abs(Number(check.difference)) >= SMALL_DIFF),
+    ...checks.filter((check) => check.status === 'missing'),
+  ].sort((a, b) => Math.abs(Number(b.difference ?? b.expected)) - Math.abs(Number(a.difference ?? a.expected)));
+  const small = mismatches.filter((check) => Math.abs(Number(check.difference)) < SMALL_DIFF);
+  const diffColor = Number(difference) < 0 ? 'red' : Number(difference) > 0 ? 'teal' : undefined;
+  const totals: [string, string, string | undefined][] = [
+    ['Ожидалось', money(expected), undefined],
+    ['Пришло', money(received), undefined],
+    ['Разница', signedMoney(difference), diffColor],
+  ];
+
+  return (
+    <Panel title={`Расчёт против выписки · ${year}`} subtitle="По выплатам, которые уже были: сколько насчитали и сколько реально пришло на счёт.">
+      <Grid gutter="md">
+        {totals.map(([label, value, color]) => (
+          <Grid.Col key={label} span={{ base: 12, xs: 4 }}>
+            <Text size="xs" tt="uppercase" fw={700} c="dimmed" style={{ letterSpacing: '0.08em' }}>
+              {label}
+            </Text>
+            <Text fz={24} fw={800} c={color}>
+              {value}
+            </Text>
+          </Grid.Col>
+        ))}
+      </Grid>
+      <Group gap="xs" mt="sm">
+        <Badge variant="light" color="teal" radius="sm" tt="none">
+          ✓ совпало {count('confirmed')}
+        </Badge>
+        <Badge variant="light" color="orange" radius="sm" tt="none">
+          ⚠ расхождений {count('mismatch')}
+        </Badge>
+        <Badge variant="light" color="red" radius="sm" tt="none">
+          ✗ не найдено {count('missing')}
+        </Badge>
+        {count('no_statement') > 0 && (
+          <Badge variant="light" color="gray" radius="sm" tt="none">
+            нет выписки {count('no_statement')}
+          </Badge>
+        )}
+        <Badge variant="light" color="blue" radius="sm" tt="none">
+          ⏳ впереди {count('expected')}
+        </Badge>
+      </Group>
+      {big.length > 0 && (
+        <ScrollArea>
+          <Table verticalSpacing={4} mt="md" fz="sm" miw={520}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Крупные расхождения (от {SMALL_DIFF} ₽)</Table.Th>
+                <Table.Th ta="right">Ждали</Table.Th>
+                <Table.Th ta="right">Пришло</Table.Th>
+                <Table.Th ta="right">Разница</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {big.map((check) => (
+                <Table.Tr key={`${check.date}-${check.kind}`}>
+                  <Table.Td>
+                    {date(check.date)} · {PAYMENT_KIND[check.kind]?.toLowerCase() ?? check.kind}
+                    {check.operation_date && check.operation_date !== check.date && (
+                      <Text span size="xs" c="dimmed">
+                        {' '}
+                        (пришло {date(check.operation_date)})
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td ta="right">{money(check.expected)}</Table.Td>
+                  <Table.Td ta="right">{check.operation_amount === null ? 'не пришло' : money(check.operation_amount)}</Table.Td>
+                  <Table.Td ta="right" fw={700} c={Number(check.difference ?? -1) < 0 ? 'red' : 'teal'}>
+                    {signedMoney(check.difference ?? `-${check.expected}`)}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      )}
+      {small.length > 0 && (
+        <Text size="sm" c="dimmed" mt="sm">
+          Копеечные (до {SMALL_DIFF} ₽): {small.length} выплат, в сумме {signedMoney(sum(small.map((check) => check.difference ?? '0')))} — округление.
+        </Text>
+      )}
+    </Panel>
+  );
+}
+
 /** Выплата значком: дата, цвет — статус; отпускные 🏖, больничный 🤒. */
 function PaymentChip({ payment }: { payment: PaymentOut }) {
   const chip = CHIP[payment.status];
@@ -173,7 +274,16 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
   const [open, setOpen] = useState<number | null>(current);
   const maxNet = Math.max(...report.months.map((month) => Number(month.net)), 1);
   const changeOf = (month: number) => whatIf?.months.find((item) => item.month === month);
-  const columns = whatIf ? 8 : 6;
+  const withChecks = Boolean(checks?.length);
+  const columns = (whatIf ? 8 : 6) + (withChecks ? 1 : 0);
+  /** Сумма расхождений с выпиской по выплатам месяца; null — сравнивать нечего. */
+  const monthDiff = (payments: PaymentOut[]): string | null => {
+    const found = payments.flatMap((payment) => {
+      const check = checkOf(payment.date, payment.kind);
+      return check?.difference != null ? [check.difference] : [];
+    });
+    return found.length ? sum(found) : null;
+  };
 
   return (
     <Stack gap="lg">
@@ -186,9 +296,11 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
         </Grid.Col>
       </Grid>
 
+      {checks && <CheckSummary checks={checks} year={report.year} />}
+
       <Panel title="По месяцам" subtitle="По месяцу, за который начислено, — как в расчётном листке. Клик по месяцу — его выплаты и сверка с выпиской.">
         <ScrollArea>
-          <Table verticalSpacing="xs" miw={whatIf ? 900 : 720} highlightOnHover>
+          <Table verticalSpacing="xs" miw={(whatIf ? 900 : 720) + (withChecks ? 110 : 0)} highlightOnHover>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Месяц</Table.Th>
@@ -197,6 +309,7 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                 <Table.Th ta="right">На руки</Table.Th>
                 {whatIf && <Table.Th ta="right">Станет</Table.Th>}
                 {whatIf && <Table.Th ta="right">Разница</Table.Th>}
+                {withChecks && <Table.Th ta="right">Δ выписка</Table.Th>}
                 <Table.Th>Выплаты</Table.Th>
                 <Table.Th w={8} />
               </Table.Tr>
@@ -208,6 +321,7 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                 const expanded = open === month.month;
                 const change = changeOf(month.month);
                 const isCurrent = month.month === current;
+                const diff = withChecks ? monthDiff(payments) : null;
                 return (
                   <Fragment key={month.month}>
                     <Table.Tr
@@ -248,6 +362,11 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                           {change && Number(change.net_change) !== 0 ? signedMoney(change.net_change) : '—'}
                         </Table.Td>
                       )}
+                      {withChecks && (
+                        <Table.Td ta="right" fw={600} c={diff === null || Math.abs(Number(diff)) < 1 ? 'dimmed' : Number(diff) < 0 ? 'red' : 'teal'}>
+                          {diff === null ? '—' : signedMoney(diff)}
+                        </Table.Td>
+                      )}
                       <Table.Td>
                         <Group gap={4}>
                           {payments.map((payment, index) => (
@@ -280,6 +399,7 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                           </Table.Td>
                           {whatIf && <Table.Td />}
                           {whatIf && <Table.Td />}
+                          {withChecks && <Table.Td />}
                           <Table.Td colSpan={2}>
                             <Group gap={6} wrap="nowrap">
                               <PaymentStatusBadge status={payment.status} />
@@ -313,6 +433,7 @@ export function YearOverview({ report, checks, whatIf }: { report: YearReportOut
                     {signedMoney(whatIf.net_change)}
                   </Table.Th>
                 )}
+                {withChecks && <Table.Th />}
                 <Table.Th colSpan={2} />
               </Table.Tr>
             </Table.Tfoot>

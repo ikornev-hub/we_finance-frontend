@@ -62,9 +62,36 @@ function NoDataNotice() {
   );
 }
 
+/** «Нет условий на 2025-01-09» от бэкенда → дата, с которой не хватает условий работы. */
+function missingTermsDate(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 422) return null;
+  const text = [error.message, ...error.problems.map((problem) => problem.message)].join(' ');
+  return /Нет условий на (\d{4}-\d{2}-\d{2})/.exec(text)?.[1] ?? null;
+}
+
+function NoTermsNotice({ day }: { day: string }) {
+  return (
+    <Alert color="orange" radius="lg" variant="light" icon={<IconInfoCircle size={18} />} title={`Нет условий работы на ${date(day)}`}>
+      <Stack gap="xs">
+        <Text size="sm">
+          Отчёт за {day.slice(0, 4)} год считается по каждому рабочему дню, а условия (оклад, питание) в «Моих данных» начинаются позже. Добавь
+          условия, которые действовали с {date(day)} или раньше.
+        </Text>
+        <div>
+          <Button size="xs" variant="light" color="orange" leftSection={<IconUserEdit size={14} />} onClick={go('data')}>
+            Добавить условия
+          </Button>
+        </div>
+      </Stack>
+    </Alert>
+  );
+}
+
 function ReportError({ error }: { error: unknown }) {
   if (!error) return null;
-  return isNoProfile(error) ? <NoDataNotice /> : <ErrorAlert error={error} />;
+  if (isNoProfile(error)) return <NoDataNotice />;
+  const day = missingTermsDate(error);
+  return day ? <NoTermsNotice day={day} /> : <ErrorAlert error={error} />;
 }
 
 // ---------- главная: отчёт ----------
