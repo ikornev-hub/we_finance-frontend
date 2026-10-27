@@ -102,6 +102,7 @@ function Hero({ forecast, until }: { forecast: MonthReport['forecast']; until: s
             {rub(disposable)}
           </Text>
           <Text size="sm" c="dimmed">
+            {Number(forecast.savings) > 0 && <>в цели {rub(Number(forecast.savings))} · </>}
             потрачено {rub(Number(forecast.spent))} · осталось{' '}
             <Text span fw={700} c={left < 0 ? 'red' : 'teal'}>
               {rub(left)}

@@ -297,6 +297,7 @@ export function CinemaPage() {
                 style={{ fontSize: 'clamp(48px, 9vw, 112px)', fontWeight: 900, color: NEON, textShadow: `0 0 24px ${NEON}` }}
               />
               <Text fz={20} c="dimmed">
+                {Number(data.forecast.savings) > 0 && <>в цели {rub(Number(data.forecast.savings))} · </>}
                 потрачено {rub(Number(data.forecast.spent))} · осталось{' '}
                 <span style={{ color: Number(data.forecast.can_spend) < 0 ? RED : NEON, fontWeight: 700 }}>{rub(Number(data.forecast.can_spend))}</span>
               </Text>

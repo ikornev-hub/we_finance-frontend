@@ -18,7 +18,7 @@ export function MonthTotals({ report }: { report: MonthReport }) {
       <HeroCard
         label={report.closed ? 'Осталось по итогам месяца' : 'Можно ещё потратить'}
         value={money(report.forecast.can_spend)}
-        caption={`Располагаемый ${money(report.forecast.disposable)} − потрачено ${money(report.forecast.spent)}`}
+        caption={`Располагаемый ${money(report.forecast.disposable)}${Number(report.forecast.savings) > 0 ? ` − в цели ${money(report.forecast.savings)}` : ''} − потрачено ${money(report.forecast.spent)}`}
         icon={<IconWallet size={18} />}
       />
       <StatCard label="Доходы" value={money(report.income)} icon={<IconArrowDownRight size={16} />} badge={{ text: 'по выписке', color: 'teal' }} />
