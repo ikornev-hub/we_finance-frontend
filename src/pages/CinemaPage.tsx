@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { expensesApi, loansApi } from '../api/endpoints';
 import type { LoanDetailOut, MonthReport, SavingsGoal } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
-import { date } from '../lib/format';
+import { currentMonth, monthTitle, shiftMonth, useSelectedMonth } from '../components/expenses/common';
+import { BalanceSummary, Todo, Upcoming } from '../components/home/DayBlocks';
+import { date, todayIso } from '../lib/format';
 import { useOrSample } from '../lib/sample';
 import { MonthRace, buildRace } from '../components/cinema/MonthRace';
 import { groupLimit } from '../lib/limits';
@@ -216,6 +217,11 @@ export function CinemaPage() {
   const balance = useLoad(() => expensesApi.balance(month), `cb/${month}`);
   const goals = useLoad(() => expensesApi.goals(month), `cg/${month}`) ?? ([] as SavingsGoal[]);
   const operations = useLoad(() => expensesApi.operations({ month }), `co/${month}`);
+  const today = todayIso();
+  const next = shiftMonth(month, 1);
+  const balanceNext = useLoad(() => expensesApi.balance(next), `cb/${next}`);
+  const goalsNext = useLoad(() => expensesApi.goals(next), `cg/${next}`) ?? ([] as SavingsGoal[]);
+  const waiting = useLoad(() => expensesApi.operations({ uncategorized: true }).then((list) => list.length), 'cu');
   const categories = useLoad(() => expensesApi.categories(), 'cc');
   const loans = useLoad<LoanDetailOut[]>(async () => Promise.all((await loansApi.list()).map((loan) => loansApi.detail(loan.id))), 'cl');
   const [heroRef, heroIn] = useInView<HTMLDivElement>();
@@ -249,16 +255,22 @@ export function CinemaPage() {
               <Group justify="space-between" align="flex-end" gap="lg">
                 <Stack gap={4}>
                   <h1 className={classes.outline}>{monthTitle(month)}</h1>
-                  <Text className={classes.label}>Располагаемый бюджет</Text>
+                  <Text className={classes.label}>{month < currentMonth() ? 'Осталось по итогам месяца' : 'Можно ещё потратить'}</Text>
                   <CountUp
-                    value={Number(data.forecast.disposable)}
+                    value={Number(data.forecast.can_spend)}
                     run={heroIn}
-                    style={{ fontSize: 'clamp(40px, 6vw, 80px)', fontWeight: 900, lineHeight: 1, color: NEON, textShadow: `0 0 24px ${NEON}` }}
+                    style={{
+                      fontSize: 'clamp(40px, 6vw, 80px)',
+                      fontWeight: 900,
+                      lineHeight: 1,
+                      color: Number(data.forecast.can_spend) < 0 ? RED : NEON,
+                      textShadow: `0 0 24px ${Number(data.forecast.can_spend) < 0 ? RED : NEON}`,
+                    }}
                   />
                   <Text fz={18} c="dimmed">
-                    {Number(data.forecast.savings) > 0 && <>в цели {rub(Number(data.forecast.savings))} · </>}
-                    потрачено {rub(Number(data.forecast.spent))} · осталось{' '}
-                    <span style={{ color: Number(data.forecast.can_spend) < 0 ? RED : NEON, fontWeight: 700 }}>{rub(Number(data.forecast.can_spend))}</span>
+                    располагаемый {rub(Number(data.forecast.disposable))}
+                    {Number(data.forecast.savings) > 0 && <> · в цели {rub(Number(data.forecast.savings))}</>} · потрачено{' '}
+                    {rub(Number(data.forecast.spent))}
                   </Text>
                 </Stack>
                 {month === currentMonth() && (
@@ -290,7 +302,21 @@ export function CinemaPage() {
               <Text className={classes.scroll}>листай ↓</Text>
             </div>
 
-            <Scene label="Кадр 1" title="Траты против границ">
+            <Scene label="Кадр 1" title="Дела и ближайшее">
+              {() => (
+                <Stack gap="lg">
+                  <SimpleGrid cols={{ base: 1, md: month === currentMonth() ? 2 : 1 }} spacing="lg">
+                    {month === currentMonth() && (
+                      <Todo today={today} until={balance?.statement_until ?? null} waiting={waiting} goals={[...goals, ...goalsNext]} loans={loans ?? []} />
+                    )}
+                    <Upcoming today={today} events={[...(balance?.events ?? []), ...(balanceNext?.events ?? [])]} />
+                  </SimpleGrid>
+                  <BalanceSummary balance={balance} today={today} isCurrent={month === currentMonth()} />
+                </Stack>
+              )}
+            </Scene>
+
+            <Scene label="Кадр 2" title="Траты против границ">
               {(visible) => (
                 <Stack gap="lg">
                   {data.groups
@@ -319,7 +345,7 @@ export function CinemaPage() {
             </Scene>
 
             {(goals.some((goal) => !goal.loan_id) || (loans ?? []).length > 0) && (
-              <Scene label="Кадр 2" title="Цели и кредиты">
+              <Scene label="Кадр 3" title="Цели и кредиты">
                 {(visible) => (
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing={48}>
                   <Stack gap="xl">

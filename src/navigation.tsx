@@ -13,7 +13,6 @@ import {
   IconChartBar,
   IconCirclePlus,
   IconHeartbeat,
-  IconHome,
   IconListDetails,
   IconMovie,
   IconUserEdit,
@@ -54,7 +53,6 @@ export const TABS: Tab[] = [
     sections: [
       // Первый раздел — стартовая страница приложения (решение заказчика 2026-10-27: «Кино»).
       { id: 'cinema', label: 'Кино', icon: <IconMovie size={size} /> },
-      { id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> },
     ],
   },
   {

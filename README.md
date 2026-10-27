@@ -74,7 +74,7 @@ src/
   api/          client.ts — fetch и понятные ошибки; endpoints.ts — все эндпоинты; types.ts — типы по OpenAPI
   lib/          examples.ts — учебные примеры; format.ts — деньги и даты; confirm.tsx
   components/   Shell (шапка, вкладки, колонка иконок), Cards (KPI, панели), ErrorAlert, salary/*, loans/*
-  pages/        HomePage, IncomePage, LoansPage, CalculatorPage, ServicePage
+  pages/        CinemaPage, ExpensesPage, IncomePage, LoansPage, CalculatorPage, ServicePage
   navigation.tsx  вкладки и разделы; адрес #вкладка/раздел — работают «назад» и ссылки
 ```
 
