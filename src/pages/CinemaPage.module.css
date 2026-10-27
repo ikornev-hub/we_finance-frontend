@@ -40,8 +40,8 @@
 }
 
 .outline {
-  margin: 0 0 24px;
-  font-size: clamp(48px, 10vw, 128px);
+  margin: 0 0 8px;
+  font-size: clamp(36px, 6vw, 72px);
   line-height: 0.95;
   font-weight: 900;
   text-transform: uppercase;
@@ -92,7 +92,7 @@
 }
 
 .scroll {
-  margin-top: 48px;
+  margin-top: 16px;
   font-size: 12px;
   letter-spacing: 0.3em;
   text-transform: uppercase;

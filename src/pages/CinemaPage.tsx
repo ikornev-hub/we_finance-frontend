@@ -291,47 +291,53 @@ export function CinemaPage() {
           <Text c="dimmed">Загружаю…</Text>
         ) : (
           <>
+            {/* Первый экран: сколько доступно и разгон месяца — сразу, без скролла. */}
             <div ref={heroRef} className={`${classes.hero} ${heroIn ? classes.visible : ''}`}>
-              <h1 className={classes.outline}>{monthTitle(month)}</h1>
-              <Text className={classes.label}>Располагаемый бюджет</Text>
-              <CountUp
-                value={Number(data.forecast.disposable)}
-                run={heroIn}
-                style={{ fontSize: 'clamp(48px, 9vw, 112px)', fontWeight: 900, color: NEON, textShadow: `0 0 24px ${NEON}` }}
-              />
-              <Text fz={20} c="dimmed">
-                {Number(data.forecast.savings) > 0 && <>в цели {rub(Number(data.forecast.savings))} · </>}
-                потрачено {rub(Number(data.forecast.spent))} · осталось{' '}
-                <span style={{ color: Number(data.forecast.can_spend) < 0 ? RED : NEON, fontWeight: 700 }}>{rub(Number(data.forecast.can_spend))}</span>
-              </Text>
-              {month === currentMonth() && (
-                <Group mt="lg">
-                  <Button size="md" onClick={go('#expenses/import')}>
-                    Загрузить выписку
-                  </Button>
-                  <Button size="md" variant="outline" color="gray" onClick={go('#expenses/budget')}>
-                    Бюджет
-                  </Button>
-                </Group>
-              )}
-              <Text className={classes.scroll}>листай ↓</Text>
-            </div>
-
-            {race && balance && (
-              <Scene label="Кадр 1" title="Разгон месяца">
-                {(visible) => (
+              <Group justify="space-between" align="flex-end" gap="lg">
+                <Stack gap={4}>
+                  <h1 className={classes.outline}>{monthTitle(month)}</h1>
+                  <Text className={classes.label}>Располагаемый бюджет</Text>
+                  <CountUp
+                    value={Number(data.forecast.disposable)}
+                    run={heroIn}
+                    style={{ fontSize: 'clamp(40px, 6vw, 80px)', fontWeight: 900, lineHeight: 1, color: NEON, textShadow: `0 0 24px ${NEON}` }}
+                  />
+                  <Text fz={18} c="dimmed">
+                    {Number(data.forecast.savings) > 0 && <>в цели {rub(Number(data.forecast.savings))} · </>}
+                    потрачено {rub(Number(data.forecast.spent))} · осталось{' '}
+                    <span style={{ color: Number(data.forecast.can_spend) < 0 ? RED : NEON, fontWeight: 700 }}>{rub(Number(data.forecast.can_spend))}</span>
+                  </Text>
+                </Stack>
+                {month === currentMonth() && (
+                  <Group>
+                    <Button size="md" onClick={go('#expenses/import')}>
+                      Загрузить выписку
+                    </Button>
+                    <Button size="md" variant="outline" color="gray" onClick={go('#expenses/budget')}>
+                      Бюджет
+                    </Button>
+                  </Group>
+                )}
+              </Group>
+              {race && balance && (
+                <div style={{ marginTop: 24 }}>
+                  <Text className={classes.label} mb={8}>
+                    Разгон месяца
+                  </Text>
                   <MonthRace
                     points={race}
                     month={month}
                     today={month === currentMonth() ? Number(balance.today.slice(8, 10)) : null}
-                    run={visible}
+                    run={heroIn}
                     animate={!reduced()}
+                    height="clamp(280px, calc(100vh - 460px), 460px)"
                   />
-                )}
-              </Scene>
-            )}
+                </div>
+              )}
+              <Text className={classes.scroll}>листай ↓</Text>
+            </div>
 
-            <Scene label="Кадр 2" title="Траты против границ">
+            <Scene label="Кадр 1" title="Траты против границ">
               {(visible) => (
                 <Stack gap="lg">
                   {data.groups
@@ -360,7 +366,7 @@ export function CinemaPage() {
             </Scene>
 
             {balance && balance.expected.length > 0 && (
-              <Scene label="Кадр 3" title="Остаток на счёте">
+              <Scene label="Кадр 2" title="Остаток на счёте">
                 {(visible) => <BalanceLine balance={balance} run={visible} />}
               </Scene>
             )}
@@ -370,7 +376,7 @@ export function CinemaPage() {
               const principal = Number(loan.start.balance);
               const goal = goals.find((item) => item.loan_id === loan.id);
               return (
-                <Scene key={loan.id} label="Кадр 4" title={loan.name}>
+                <Scene key={loan.id} label="Кадр 3" title={loan.name}>
                   {(visible) => (
                     <Group align="center" gap={48} wrap="wrap">
                       <Ring share={debt / principal} run={visible} />
@@ -396,7 +402,7 @@ export function CinemaPage() {
             })}
 
             {goals.some((goal) => !goal.loan_id) && (
-              <Scene label="Кадр 5" title="Цели">
+              <Scene label="Кадр 4" title="Цели">
                 {(visible) => (
                   <Stack gap="xl">
                     {goals

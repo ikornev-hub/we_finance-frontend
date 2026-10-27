@@ -143,7 +143,22 @@ function RaceTooltip({ active, payload, label, month }: { active?: boolean; payl
 
 const OF_MONTH = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
-export function MonthRace({ points, month, today, run, animate }: { points: RacePoint[]; month: string; today: number | null; run: boolean; animate: boolean }) {
+export function MonthRace({
+  points,
+  month,
+  today,
+  run,
+  animate,
+  height = 420,
+}: {
+  points: RacePoint[];
+  month: string;
+  today: number | null;
+  run: boolean;
+  animate: boolean;
+  /** Высота графика: число (px) или CSS-выражение. */
+  height?: number | string;
+}) {
   const ofMonth = OF_MONTH[Number(month.slice(5, 7)) - 1];
   return (
     <Stack gap="sm">
@@ -158,7 +173,7 @@ export function MonthRace({ points, month, today, run, animate }: { points: Race
           пунктир — прогноз, линия — факт по выписке
         </Text>
       </Group>
-      <div style={{ width: '100%', height: 420 }}>
+      <div style={{ width: '100%', height }}>
         {run && (
           <ResponsiveContainer>
             <LineChart data={points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
