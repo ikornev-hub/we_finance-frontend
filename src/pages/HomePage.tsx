@@ -8,7 +8,7 @@ import { expensesApi, loansApi } from '../api/endpoints';
 import type { BalanceView, LoanDetailOut, MonthGroup, MonthReport, SavingsGoal, SpendingAnalysis } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { MonthSwitch, currentMonth, monthTitle, shiftMonth, useSelectedMonth } from '../components/expenses/common';
+import { currentMonth, monthTitle, shiftMonth, useSelectedMonth } from '../components/expenses/common';
 import { date, todayIso } from '../lib/format';
 import { useOrSample } from '../lib/sample';
 
@@ -38,7 +38,7 @@ function useLoad<T>(fn: () => Promise<T>, key: string): T | null {
 
 export function HomePage() {
   const today = todayIso();
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   const isCurrent = month === currentMonth();
   const next = shiftMonth(month, 1);
 
@@ -65,7 +65,6 @@ export function HomePage() {
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
         <PageHeader title={monthTitle(month)} subtitle="Сколько можно тратить, что сделать и как идёт месяц." />
-        <MonthSwitch month={month} onChange={setMonth} />
       </Group>
 
       <Hero forecast={forecast} until={until} />

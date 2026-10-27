@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { expensesApi, loansApi } from '../api/endpoints';
 import type { BalanceView, LoanDetailOut, MonthReport, SavingsGoal } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { MonthSwitch, currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
+import { currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { date } from '../lib/format';
 import { useOrSample } from '../lib/sample';
 import { MonthRace, buildRace } from '../components/cinema/MonthRace';
@@ -258,7 +258,7 @@ function Ring({ share, run }: { share: number; run: boolean }) {
 // ---------- страница ----------
 
 export function CinemaPage() {
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   const report = useOrSample(() => expensesApi.month(month), null as unknown as MonthReport, `cinema/${month}`);
   const balance = useLoad(() => expensesApi.balance(month), `cb/${month}`);
   const goals = useLoad(() => expensesApi.goals(month), `cg/${month}`) ?? ([] as SavingsGoal[]);
@@ -287,10 +287,6 @@ export function CinemaPage() {
       <div className={classes.backdrop} aria-hidden />
       <Starfield mood={mood} />
       <div className={classes.content}>
-        <Group justify="flex-end">
-          <MonthSwitch month={month} onChange={setMonth} />
-        </Group>
-
         {!data ? (
           <Text c="dimmed">Загружаю…</Text>
         ) : (

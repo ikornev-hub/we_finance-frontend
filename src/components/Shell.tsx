@@ -21,6 +21,7 @@ import { serviceApi } from '../api/endpoints';
 import { clearToken } from '../lib/session';
 import type { HealthResponse, VersionResponse } from '../api/types';
 import { type Route, TABS, type TabId, href } from '../navigation';
+import { MonthSwitch, useSelectedMonth } from './expenses/common';
 import classes from './Shell.module.css';
 
 type Status = { health: HealthResponse | null; version: VersionResponse | null; offline: boolean };
@@ -98,8 +99,17 @@ function ThemeToggle() {
   );
 }
 
+/** Экраны, которые показывают выбранный месяц: на них переключатель месяца висит в шапке. */
+const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'expenses/goals', 'expenses/review']);
+
+function HeaderMonth() {
+  const [month, setMonth] = useSelectedMonth();
+  return <MonthSwitch month={month} onChange={setMonth} />;
+}
+
 export function Shell({ route, children }: { route: Route; children: ReactNode }) {
   const status = useBackendStatus();
+  const withMonth = MONTH_SCREENS.has(`${route.tab.id}/${route.section.id}`);
 
   return (
     <AppShell header={{ height: 72 }} navbar={{ width: 76, breakpoint: 0 }} padding="lg" className={classes.shell}>
@@ -120,6 +130,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
             className={classes.tabs}
           />
           <Group gap="xs" wrap="nowrap">
+            {withMonth && <HeaderMonth />}
             <StatusPill status={status} />
             <Tooltip label="Система: состояние сервера">
               <ActionIcon

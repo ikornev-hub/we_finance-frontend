@@ -9,7 +9,7 @@ import type { MonthGroup, MonthReport, SavingsGoal } from '../../api/types';
 import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert, errorText } from '../ErrorAlert';
-import { MonthSwitch, monthTitle, shiftMonth, useSelectedMonth } from './common';
+import { monthTitle, shiftMonth, useSelectedMonth } from './common';
 
 // Пульт месяца: на что разложен доход (план) и сколько уже ушло (факт); границы трат
 // и взносы целей правятся здесь же — рублями в поле или ползунком в % располагаемого
@@ -124,7 +124,7 @@ function FactBar({ amount, target }: { amount: number; target: number | null }) 
 }
 
 export function BudgetSection() {
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   const report = useOrSample(() => expensesApi.month(month), null as unknown as MonthReport, `budget/${month}`);
   const goalsData = useOrSample(() => expensesApi.goals(month), [] as SavingsGoal[], `budget-goals/${month}`);
   const data = report.data;
@@ -216,7 +216,6 @@ export function BudgetSection() {
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
         <PageHeader title="Бюджет" subtitle="Куда идёт доход месяца: обязательные, траты по границам, цели и свободное. Двигай — итог пересчитается сразу." />
-        <MonthSwitch month={month} onChange={setMonth} />
       </Group>
 
       <Panel title={`Доход ${monthTitle(month).toLowerCase()}: ${rub(income)}`} subtitle="План — как разложен доход; факт — сколько уже ушло по выписке">

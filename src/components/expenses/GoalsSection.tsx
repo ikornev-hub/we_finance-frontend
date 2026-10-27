@@ -11,7 +11,7 @@ import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert, errorText } from '../ErrorAlert';
 import { DateField, MoneyField } from '../fields';
-import { MonthSwitch, currentMonth, monthTitle, shiftMonth, useSelectedMonth } from './common';
+import { currentMonth, monthTitle, shiftMonth, useSelectedMonth } from './common';
 
 const IN_MONTH = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
 const TO_MONTH = ['январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню', 'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю'];
@@ -47,7 +47,7 @@ const dayMonth = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
 /** Цели накоплений: подушка, квартира, свадьба. «Сначала себе»: план откладывается до трат. */
 export function GoalsSection() {
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   const goals = useOrSample(() => expensesApi.goals(month), [] as SavingsGoal[], `goals/${month}`);
   const [editing, setEditing] = useState<{
     id: string | null;
@@ -91,7 +91,6 @@ export function GoalsSection() {
       <Group justify="space-between" align="flex-start">
         <PageHeader title="Цели" subtitle="Подушка, квартира, свадьба. «Сначала себе»: план откладывается раньше трат, траты — из того, что осталось." />
         <Group gap="sm">
-          <MonthSwitch month={month} onChange={setMonth} />
           <Button leftSection={<IconPlus size={16} />} onClick={() => setEditing({ id: null, goal: { ...EMPTY } })}>
             Новая цель
           </Button>

@@ -1,6 +1,6 @@
 import { Alert, Button, Group, Select, Text } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight, IconFlask } from '@tabler/icons-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import type { ExpenseCategory, IncomeCheckStatus } from '../../api/types';
 
@@ -81,19 +81,31 @@ function storedMonth(): string | null {
   }
 }
 
-/** Выбранный месяц — общий для «Главной», «Месяца» и «Разбора», переживает переходы и F5 (#11). */
+const monthListeners = new Set<() => void>();
+
+function setSelectedMonth(next: string) {
+  selectedMonth = next;
+  try {
+    sessionStorage.setItem(MONTH_KEY, next);
+  } catch {
+    // без хранилища месяц живёт до перезагрузки
+  }
+  monthListeners.forEach((listener) => listener());
+}
+
+function subscribeMonth(listener: () => void) {
+  monthListeners.add(listener);
+  return () => monthListeners.delete(listener);
+}
+
+function readMonth(): string {
+  selectedMonth ??= storedMonth() ?? currentMonth();
+  return selectedMonth;
+}
+
+/** Выбранный месяц — один на всё приложение: переключатель в шапке меняет его на всех экранах сразу, переживает переходы и F5 (#11). */
 export function useSelectedMonth(): [string, (month: string) => void] {
-  const [month, setMonthState] = useState<string>(() => selectedMonth ?? storedMonth() ?? currentMonth());
-  const setMonth = useCallback((next: string) => {
-    selectedMonth = next;
-    try {
-      sessionStorage.setItem(MONTH_KEY, next);
-    } catch {
-      // без хранилища месяц живёт до перезагрузки
-    }
-    setMonthState(next);
-  }, []);
-  return [month, setMonth];
+  return [useSyncExternalStore(subscribeMonth, readMonth), setSelectedMonth];
 }
 
 export function currentMonth(): string {

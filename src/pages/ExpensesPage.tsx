@@ -31,7 +31,7 @@ import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
-import { CategorySelect, MonthSwitch, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
+import { CategorySelect, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { AnalysisSection } from '../components/expenses/AnalysisSection';
 import { BudgetSection } from '../components/expenses/BudgetSection';
 import { GoalsSection } from '../components/expenses/GoalsSection';
@@ -91,8 +91,9 @@ function useCategories() {
 // ---------- месяц ----------
 
 function MonthSection() {
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
+  useEffect(() => setPicked(null), [month]);
   const report = useOrSample(() => expensesApi.month(month), SAMPLE_MONTH, month);
 
   return (
@@ -100,7 +101,6 @@ function MonthSection() {
       <Group justify="space-between" align="flex-start">
         <PageHeader title="Расходы" subtitle="Куда ушли деньги за месяц: категории, доли от располагаемого дохода, цели и перерасход." />
         <Group gap="sm">
-          <MonthSwitch month={month} onChange={(next) => { setMonth(next); setPicked(null); }} />
           <Button variant="default" leftSection={<IconUpload size={16} />} onClick={go('import')}>
             Загрузить выписку
           </Button>
@@ -159,7 +159,7 @@ function CategoryOperations({ month, categoryId, title, onChanged }: { month: st
 // ---------- разобрать неопределённые ----------
 
 function ReviewSection() {
-  const [month, setMonth] = useSelectedMonth();
+  const [month] = useSelectedMonth();
   // По умолчанию — выбранный месяц, как в баннере «Ждут разбора: N» (#10).
   const [scope, setScope] = useState<'month' | 'all'>('month');
   const operations = useOrSample(
@@ -185,7 +185,6 @@ function ReviewSection() {
               { value: 'all', label: 'Все месяцы' },
             ]}
           />
-          {scope === 'month' && <MonthSwitch month={month} onChange={setMonth} />}
         </Group>
       </Group>
       {operations.sample && <SampleNotice what="Операции без категории" />}
