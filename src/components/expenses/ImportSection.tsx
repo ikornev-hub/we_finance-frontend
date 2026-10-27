@@ -1,10 +1,10 @@
-import { Accordion, Alert, Badge, Button, Checkbox, FileInput, Group, SegmentedControl, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { Accordion, Alert, Avatar, Badge, Button, Checkbox, FileInput, Group, Paper, SegmentedControl, Stack, Table, Text, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconFileSpreadsheet, IconListSearch, IconX } from '@tabler/icons-react';
+import { IconCheck, IconFileSpreadsheet, IconListSearch, IconRobot, IconX } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
 import { expensesApi } from '../../api/endpoints';
-import type { ExpenseCategory, ImportPreview, ImportResult, PreviewOperation } from '../../api/types';
+import type { AiReport, ExpenseCategory, ImportPreview, ImportResult, PreviewOperation } from '../../api/types';
 import { date } from '../../lib/format';
 import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
@@ -21,6 +21,44 @@ const UNCATEGORIZED = 'Неопределённые';
 interface Choice {
   category_id: string;
   remember: boolean;
+}
+
+const BOT_COLOR: Record<AiReport['status'], string> = { ok: 'violet', skipped: 'gray', off: 'gray', error: 'orange' };
+const BOT_STATUS: Record<AiReport['status'], string> = { ok: 'разложил', skipped: 'не понадобился', off: 'выключен', error: 'не ответил' };
+
+/** Окно бота над списком: что разложила модель и в чём не уверена (system/expenses.md §2.10). */
+function BotWindow({ report }: { report: AiReport }) {
+  return (
+    <Paper withBorder radius="lg" p="md" style={{ borderColor: `var(--mantine-color-${BOT_COLOR[report.status]}-light-color)` }}>
+      <Group align="flex-start" wrap="nowrap" gap="md">
+        <Avatar color={BOT_COLOR[report.status]} radius="xl" variant="light">
+          <IconRobot size={20} />
+        </Avatar>
+        <Stack gap={4} style={{ minWidth: 0 }}>
+          <Group gap="xs">
+            <Text fw={700}>ИИ-помощник</Text>
+            <Badge size="sm" variant="light" color={BOT_COLOR[report.status]}>
+              {BOT_STATUS[report.status]}
+              {report.status === 'ok' ? ` ${report.suggested}` : ''}
+            </Badge>
+            {report.model && (
+              <Text size="xs" c="dimmed">
+                модель {report.model}
+              </Text>
+            )}
+          </Group>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {report.message}
+          </Text>
+          {report.status === 'ok' && report.suggested > 0 && (
+            <Text size="xs" c="dimmed">
+              Его варианты помечены «ИИ». Согласен — просто «Сохранить»; нет — выбери другую категорию.
+            </Text>
+          )}
+        </Stack>
+      </Group>
+    </Paper>
+  );
 }
 
 export function ImportSection() {
@@ -62,6 +100,12 @@ export function ImportSection() {
     setBusy('save');
     try {
       const overrides = Object.entries(choices).map(([bank_operation_id, choice]) => ({ bank_operation_id, ...choice }));
+      // подсказки ИИ, которые не тронули, — тоже правки: при сохранении backend модель не зовёт (§2.10)
+      for (const operation of preview.operations) {
+        if (operation.suggested_by === 'ai' && operation.category_id && !choices[operation.bank_operation_id]) {
+          overrides.push({ bank_operation_id: operation.bank_operation_id, category_id: operation.category_id, remember: false });
+        }
+      }
       const result = await expensesApi.importStatement(bank, file, overrides);
       setSaved(result);
       notifications.show({ color: 'teal', title: 'Выписка сохранена', message: `Новых операций: ${result.new}` });
@@ -147,6 +191,11 @@ export function ImportSection() {
             <Button leftSection={<IconListSearch size={16} />} disabled={!file || Boolean(preview)} loading={busy === 'check'} onClick={check}>
               Проверить
             </Button>
+            {busy === 'check' && (
+              <Text size="sm" c="dimmed">
+                Разбираю выписку; то, что не узнали правила, раскладывает ИИ — до минуты-двух.
+              </Text>
+            )}
           </Group>
           <ErrorAlert error={error} />
           {saved && (
@@ -187,6 +236,7 @@ export function ImportSection() {
             </Stack>
           ) : (
             <Stack gap="md">
+              {preview.ai && <BotWindow report={preview.ai} />}
               {selected.size > 0 && (
                 <Group
                   gap="sm"
@@ -206,7 +256,14 @@ export function ImportSection() {
                 </Group>
               )}
 
-              <Accordion multiple defaultValue={groups.filter(([name]) => name === UNCATEGORIZED).map(([name]) => name)} variant="separated" radius="md">
+              <Accordion
+                multiple
+                defaultValue={groups
+                  .filter(([name, operations]) => name === UNCATEGORIZED || operations.some((operation) => operation.suggested_by === 'ai'))
+                  .map(([name]) => name)}
+                variant="separated"
+                radius="md"
+              >
                 {groups.map(([name, operations]) => {
                   const sum = operations.reduce((total, operation) => total + Number(operation.amount), 0);
                   const edited = operations.filter((operation) => choices[operation.bank_operation_id]).length;
@@ -246,7 +303,7 @@ export function ImportSection() {
                                       onChange={() => toggle(operation.bank_operation_id)}
                                     />
                                   </Table.Td>
-                                  <Table.Td w={90}>
+                                  <Table.Td w={90} visibleFrom="sm">
                                     <Text size="sm">{date(operation.day)}</Text>
                                   </Table.Td>
                                   <Table.Td>
@@ -256,16 +313,36 @@ export function ImportSection() {
                                     <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>
                                       {operation.description}
                                     </Text>
-                                    <Badge mt={4} size="xs" variant="light" color={operation.reason.includes('реши сам') || operation.reason === 'не распознано' ? 'orange' : 'gray'}>
-                                      {operation.reason}
-                                    </Badge>
+                                    <Group hiddenFrom="sm" justify="space-between" mt={4} gap="xs">
+                                      <Text size="xs" c="dimmed">
+                                        {date(operation.day)}
+                                      </Text>
+                                      <Text size="sm" fw={600} c={Number(operation.amount) > 0 ? 'teal' : undefined}>
+                                        {rub(Number(operation.amount))}
+                                      </Text>
+                                    </Group>
+                                    <Group gap={4} mt={4}>
+                                      {operation.suggested_by === 'ai' && (
+                                        <Badge size="xs" variant="filled" color="violet" leftSection={<IconRobot size={10} />}>
+                                          ИИ
+                                        </Badge>
+                                      )}
+                                      <Badge
+                                        size="xs"
+                                        variant="light"
+                                        color={operation.suggested_by === 'ai' ? 'violet' : operation.reason.includes('реши сам') || operation.reason === 'не распознано' ? 'orange' : 'gray'}
+                                        style={{ textTransform: 'none', maxWidth: '100%' }}
+                                      >
+                                        {operation.reason.replace(/^ИИ: /, '')}
+                                      </Badge>
+                                    </Group>
                                   </Table.Td>
-                                  <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
+                                  <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }} visibleFrom="sm">
                                     <Text size="sm" fw={600} c={Number(operation.amount) > 0 ? 'teal' : undefined}>
                                       {rub(Number(operation.amount))}
                                     </Text>
                                   </Table.Td>
-                                  <Table.Td w={290}>
+                                  <Table.Td w={290} visibleFrom="sm">
                                     <Stack gap={4}>
                                       <CategorySelect categories={categories} value={chosen(operation)} onChange={(value) => choose(operation, value)} width={270} />
                                       {choice && (
@@ -285,7 +362,19 @@ export function ImportSection() {
                                   </Table.Td>
                                 </Table.Tr>
                               );
-                            })}
+                            }).flatMap((row, index) => [
+                              row,
+                              <Table.Tr key={`${operations[index].bank_operation_id}-m`} hiddenFrom="sm">
+                                <Table.Td colSpan={2} pt={0}>
+                                  <CategorySelect
+                                    categories={categories}
+                                    value={chosen(operations[index])}
+                                    onChange={(value) => choose(operations[index], value)}
+                                    width="100%"
+                                  />
+                                </Table.Td>
+                              </Table.Tr>,
+                            ])}
                           </Table.Tbody>
                         </Table>
                       </Accordion.Panel>

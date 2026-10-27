@@ -32,7 +32,7 @@ export function CategorySelect({
   categories: ExpenseCategory[];
   value: string | null;
   onChange: (value: string | null) => void;
-  width?: number;
+  width?: number | string;
 }) {
   const options = categoryOptions(categories);
   const label = options.find((option) => option.value === value)?.label ?? '';

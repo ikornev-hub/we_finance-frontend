@@ -263,6 +263,16 @@ export interface PreviewOperation {
   /** «правило: …», «MCC 5411», «справочник: …», «перевод человеку — реши сам», «не распознано». */
   reason: string;
   can_remember: boolean;
+  /** "ai" — категорию предложила модель (system/expenses.md §2.10). */
+  suggested_by?: 'ai' | null;
+}
+
+/** Ответ бота над списком: ok — разложил, off — модель не подключена, error — не ответила, skipped — нечего раскладывать. */
+export interface AiReport {
+  status: 'ok' | 'off' | 'error' | 'skipped';
+  model: string | null;
+  message: string;
+  suggested: number;
 }
 
 /** Проверка выписки перед сохранением. */
@@ -273,6 +283,7 @@ export interface ImportPreview {
   new: number;
   duplicates: number;
   operations: PreviewOperation[];
+  ai?: AiReport | null;
 }
 
 export interface ImportOverride {
