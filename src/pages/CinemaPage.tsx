@@ -8,7 +8,7 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { MonthSwitch, currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { date } from '../lib/format';
 import { useOrSample } from '../lib/sample';
-import { MoneyFlow } from '../components/cinema/MoneyFlow';
+import { MonthRace, buildRace } from '../components/cinema/MonthRace';
 import classes from './CinemaPage.module.css';
 
 // Пилот «Кино» (решение заказчика 2026-10-27, референс — промо «Хоум кредит таргет» Студии Лебедева):
@@ -262,6 +262,8 @@ export function CinemaPage() {
   const report = useOrSample(() => expensesApi.month(month), null as unknown as MonthReport, `cinema/${month}`);
   const balance = useLoad(() => expensesApi.balance(month), `cb/${month}`);
   const goals = useLoad(() => expensesApi.goals(month), `cg/${month}`) ?? ([] as SavingsGoal[]);
+  const operations = useLoad(() => expensesApi.operations({ month }), `co/${month}`);
+  const categories = useLoad(() => expensesApi.categories(), 'cc');
   const loans = useLoad<LoanDetailOut[]>(async () => Promise.all((await loansApi.list()).map((loan) => loansApi.detail(loan.id))), 'cl');
   const [heroRef, heroIn] = useInView<HTMLDivElement>();
 
@@ -273,6 +275,10 @@ export function CinemaPage() {
     const left = Number(data.forecast.can_spend);
     return free <= 0 ? -1 : Math.max(-1, Math.min(1, left / free));
   }, [data]);
+  const race = useMemo(
+    () => (data && balance && operations && categories && balance.month === month ? buildRace(data, balance, operations, categories) : null),
+    [data, balance, operations, categories, month],
+  );
 
   if (report.error) return <ErrorAlert error={report.error} />;
 
@@ -315,9 +321,19 @@ export function CinemaPage() {
               <Text className={classes.scroll}>листай ↓</Text>
             </div>
 
-            <Scene label="Кадр 1" title="Куда ушли деньги">
-              {(visible) => <MoneyFlow report={data} run={visible} />}
-            </Scene>
+            {race && balance && (
+              <Scene label="Кадр 1" title="Разгон месяца">
+                {(visible) => (
+                  <MonthRace
+                    points={race}
+                    month={month}
+                    today={month === currentMonth() ? Number(balance.today.slice(8, 10)) : null}
+                    run={visible}
+                    animate={!reduced()}
+                  />
+                )}
+              </Scene>
+            )}
 
             <Scene label="Кадр 2" title="Траты против границ">
               {(visible) => (
