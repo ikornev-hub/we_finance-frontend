@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Select, Text } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Popover, Select, SimpleGrid, Text } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight, IconFlask } from '@tabler/icons-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
@@ -119,15 +119,79 @@ export function shiftMonth(month: string, delta: number): string {
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
 }
 
+const SHORT_MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+
+/** Кнопка с месяцем: по клику — окошко выбора (год стрелками, 12 плиток, «Текущий месяц»). */
+function MonthPicker({ month, onChange }: { month: string; onChange: (month: string) => void }) {
+  const [opened, setOpened] = useState(false);
+  const [year, setYear] = useState(Number(month.slice(0, 4)));
+  const now = currentMonth();
+  const pick = (next: string) => {
+    onChange(next);
+    setOpened(false);
+  };
+  return (
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      position="bottom"
+      shadow="lg"
+      radius="md"
+      withinPortal={false}
+      trapFocus
+    >
+      <Popover.Target>
+        <Button variant="default" size="sm" miw={140} onClick={() => {
+            setYear(Number(month.slice(0, 4)));
+            setOpened((value) => !value);
+          }} aria-label="Выбрать месяц">
+          {monthTitle(month)}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown p="sm" w={264}>
+        <Group justify="space-between" mb="xs">
+          <ActionIcon variant="subtle" color="gray" onClick={() => setYear(year - 1)} aria-label="Предыдущий год">
+            <IconChevronLeft size={16} />
+          </ActionIcon>
+          <Text fw={700}>{year}</Text>
+          <ActionIcon variant="subtle" color="gray" onClick={() => setYear(year + 1)} aria-label="Следующий год">
+            <IconChevronRight size={16} />
+          </ActionIcon>
+        </Group>
+        <SimpleGrid cols={3} spacing={6}>
+          {SHORT_MONTHS.map((name, index) => {
+            const value = `${year}-${String(index + 1).padStart(2, '0')}`;
+            const selected = value === month;
+            return (
+              <Button
+                key={value}
+                size="md"
+                px={0}
+                variant={selected ? 'filled' : value === now ? 'outline' : 'subtle'}
+                color={selected || value === now ? 'brand' : 'gray'}
+                onClick={() => pick(value)}
+                aria-pressed={selected}
+              >
+                {name}
+              </Button>
+            );
+          })}
+        </SimpleGrid>
+        <Button variant="light" color="gray" fullWidth mt="sm" onClick={() => pick(now)} disabled={month === now}>
+          Текущий месяц
+        </Button>
+      </Popover.Dropdown>
+    </Popover>
+  );
+}
+
 export function MonthSwitch({ month, onChange }: { month: string; onChange: (month: string) => void }) {
   return (
     <Group gap={4}>
       <Button variant="default" size="sm" px={8} onClick={() => onChange(shiftMonth(month, -1))} aria-label="Предыдущий месяц">
         <IconChevronLeft size={16} />
       </Button>
-      <Button variant="default" size="sm" miw={140}>
-        {monthTitle(month)}
-      </Button>
+      <MonthPicker month={month} onChange={onChange} />
       <Button variant="default" size="sm" px={8} onClick={() => onChange(shiftMonth(month, 1))} aria-label="Следующий месяц">
         <IconChevronRight size={16} />
       </Button>

@@ -26,6 +26,8 @@
   --mantine-color-gray-text: #c9d1d9;
   --mantine-color-gray-filled: #c9d1d9;
   --burger-color: #f2f5f7;
+  /* окошко выбора месяца — внутри шапки, тоже тёмное */
+  --mantine-color-body: #0d1318;
 }
 
 /* Центр — ровно посередине экрана, сколько бы места ни заняли края. */
