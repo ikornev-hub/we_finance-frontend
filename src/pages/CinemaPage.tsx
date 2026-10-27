@@ -8,6 +8,7 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { MonthSwitch, currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { date } from '../lib/format';
 import { useOrSample } from '../lib/sample';
+import { MoneyFlow } from '../components/cinema/MoneyFlow';
 import classes from './CinemaPage.module.css';
 
 // Пилот «Кино» (решение заказчика 2026-10-27, референс — промо «Хоум кредит таргет» Студии Лебедева):
@@ -16,7 +17,6 @@ import classes from './CinemaPage.module.css';
 
 const NEON = '#2ee6d6';
 const RED = '#ff4d5e';
-const COIN = 500; // одна точка в облаке трат ≈ 500 ₽
 const TO_MONTH = ['январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню', 'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю'];
 const toMonth = (month: string) => `${TO_MONTH[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
@@ -146,81 +146,6 @@ function Starfield({ mood }: { mood: number }) {
     };
   }, [mood]);
   return <canvas ref={ref} className={classes.stars} aria-hidden />;
-}
-
-// ---------- облако монеток: траты собираются в группы ----------
-
-const GROUP_COLOR: Record<string, string> = { mandatory: '#8a94a6', managed: NEON, unmanaged: RED, purchases: '#9b7bff' };
-
-function CoinCloud({ report, run }: { report: MonthReport; run: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const groups = report.groups.filter((group) => group.code !== 'service' && Number(group.amount) > 0);
-  useEffect(() => {
-    const canvas = ref.current!;
-    const context = canvas.getContext('2d')!;
-    const width = (canvas.width = canvas.clientWidth * devicePixelRatio);
-    const height = (canvas.height = canvas.clientHeight * devicePixelRatio);
-    // целевые места: каждая группа — свой «остров» по ширине, точки упакованы по спирали подсолнуха
-    const coins: { x0: number; y0: number; x1: number; y1: number; color: string; delay: number }[] = [];
-    const slot = width / Math.max(groups.length, 1);
-    groups.forEach((group, index) => {
-      const n = Math.min(Math.round(Number(group.amount) / COIN), 700);
-      const cx = slot * (index + 0.5);
-      const cy = height * 0.48;
-      const spread = Math.min(slot * 0.42, height * 0.42) / Math.sqrt(Math.max(n, 1));
-      for (let k = 0; k < n; k++) {
-        const angle = k * 2.399963;
-        const radius = spread * Math.sqrt(k);
-        coins.push({
-          x0: Math.random() * width,
-          y0: Math.random() * height,
-          x1: cx + Math.cos(angle) * radius,
-          y1: cy + Math.sin(angle) * radius,
-          color: GROUP_COLOR[group.code] ?? NEON,
-          delay: Math.random() * 400,
-        });
-      }
-    });
-    let frame = 0;
-    const start = performance.now();
-    const draw = (now: number) => {
-      context.clearRect(0, 0, width, height);
-      for (const coin of coins) {
-        const t = run ? (reduced() ? 1 : Math.min(Math.max((now - start - coin.delay) / 1400, 0), 1)) : 0;
-        const e = 1 - Math.pow(1 - t, 3);
-        context.fillStyle = coin.color;
-        context.shadowColor = coin.color;
-        context.shadowBlur = 6 * devicePixelRatio;
-        context.globalAlpha = 0.35 + 0.65 * e;
-        context.beginPath();
-        context.arc(coin.x0 + (coin.x1 - coin.x0) * e, coin.y0 + (coin.y1 - coin.y0) * e, 2.2 * devicePixelRatio, 0, Math.PI * 2);
-        context.fill();
-      }
-      context.globalAlpha = 1;
-      context.shadowBlur = 0;
-      if (run && now - start < 2200 && !reduced()) frame = requestAnimationFrame(draw);
-    };
-    frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [report, run]);
-  return (
-    <Stack gap="xs">
-      <canvas ref={ref} className={classes.cloud} />
-      <div className={classes.legend} style={{ gridTemplateColumns: `repeat(${Math.max(groups.length, 1)}, 1fr)` }}>
-        {groups.map((group) => (
-          <div key={group.code}>
-            <Text fw={700} c={GROUP_COLOR[group.code]}>
-              {group.name}
-            </Text>
-            <CountUp value={Number(group.amount)} run={run} style={{ fontSize: 22, fontWeight: 800 }} />
-          </div>
-        ))}
-      </div>
-      <Text size="xs" c="dimmed" ta="center">
-        одна точка ≈ {COIN} ₽
-      </Text>
-    </Stack>
-  );
 }
 
 // ---------- полосы трат ----------
@@ -389,7 +314,7 @@ export function CinemaPage() {
             </div>
 
             <Scene label="Кадр 1" title="Куда ушли деньги">
-              {(visible) => <CoinCloud report={data} run={visible} />}
+              {(visible) => <MoneyFlow report={data} run={visible} />}
             </Scene>
 
             <Scene label="Кадр 2" title="Траты против границ">
