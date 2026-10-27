@@ -1,9 +1,9 @@
-import { Button, Group, Stack, Text } from '@mantine/core';
+import { Button, Group, SimpleGrid, Stack, Text } from '@mantine/core';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
-import type { BalanceView, LoanDetailOut, MonthReport, SavingsGoal } from '../api/types';
+import type { LoanDetailOut, MonthReport, SavingsGoal } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { currentMonth, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { date } from '../lib/format';
@@ -176,61 +176,13 @@ function NeonBar({ label, spent, limit, run, strong }: { label: string; spent: n
   );
 }
 
-// ---------- остаток: линия рисуется ----------
-
-function BalanceLine({ balance, run }: { balance: BalanceView; run: boolean }) {
-  const expected = balance.expected.map((point) => Number(point.balance));
-  const actual = balance.actual.map((point) => Number(point.balance));
-  const all = [...expected, ...actual, 0];
-  const min = Math.min(...all);
-  const max = Math.max(...all);
-  const w = 1000;
-  const h = 260;
-  const x = (i: number) => (i / Math.max(expected.length - 1, 1)) * w;
-  const y = (v: number) => h - ((v - min) / (max - min || 1)) * h;
-  const path = (values: number[]) => values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const last = balance.actual.at(-1);
-  const expectedAtLast = last ? Number(balance.expected.find((p) => p.day === last.day)?.balance ?? 0) : 0;
-  const diff = last ? Number(last.balance) - expectedAtLast : 0;
-  return (
-    <Stack gap="md">
-      <svg viewBox={`0 0 ${w} ${h}`} className={classes.line} preserveAspectRatio="none">
-        <line x1={0} x2={w} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.15)" />
-        <path d={path(expected)} className={`${classes.draw} ${run ? classes.drawn : ''}`} stroke="rgba(46,230,214,0.45)" fill="none" strokeWidth={2} />
-        <path
-          d={path(actual)}
-          className={`${classes.draw} ${run ? classes.drawn : ''}`}
-          stroke="#f26b3a"
-          fill="none"
-          strokeWidth={3}
-          style={{ filter: 'drop-shadow(0 0 6px #f26b3a)' }}
-        />
-      </svg>
-      <Group gap="xl">
-        <Text size="sm">
-          <span style={{ color: '#f26b3a' }}>━</span> факт по выписке
-        </Text>
-        <Text size="sm">
-          <span style={{ color: NEON, opacity: 0.6 }}>━</span> ожидание по плану
-        </Text>
-      </Group>
-      {last && (
-        <Text fz={22} fw={700}>
-          На {date(last.day)} на счёте {rub(Number(last.balance))} —{' '}
-          <span style={{ color: diff < 0 ? RED : NEON }}>{diff < 0 ? `на ${rub(-diff)} хуже плана` : `на ${rub(diff)} лучше плана`}</span>
-        </Text>
-      )}
-    </Stack>
-  );
-}
-
 // ---------- кредит: кольцо ----------
 
 function Ring({ share, run }: { share: number; run: boolean }) {
   const r = 90;
   const length = 2 * Math.PI * r;
   return (
-    <svg viewBox="0 0 220 220" width={220} height={220}>
+    <svg viewBox="0 0 220 220" width={150} height={150} style={{ flexShrink: 0 }}>
       <circle cx={110} cy={110} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={14} fill="none" />
       <circle
         cx={110}
@@ -365,46 +317,13 @@ export function CinemaPage() {
               )}
             </Scene>
 
-            {balance && balance.expected.length > 0 && (
-              <Scene label="Кадр 2" title="Остаток на счёте">
-                {(visible) => <BalanceLine balance={balance} run={visible} />}
-              </Scene>
-            )}
-
-            {(loans ?? []).map((loan) => {
-              const debt = Number(loan.actual.balance);
-              const principal = Number(loan.start.balance);
-              const goal = goals.find((item) => item.loan_id === loan.id);
-              return (
-                <Scene key={loan.id} label="Кадр 3" title={loan.name}>
-                  {(visible) => (
-                    <Group align="center" gap={48} wrap="wrap">
-                      <Ring share={debt / principal} run={visible} />
-                      <Stack gap={6}>
-                        <Text className={classes.label}>осталось долга</Text>
-                        <CountUp value={debt} run={visible} style={{ fontSize: 56, fontWeight: 900 }} />
-                        <Text c="dimmed">
-                          из {rub(principal)} · по графику закроешь {date(loan.actual.close_date)}
-                        </Text>
-                        {goal?.closes_on && (
-                          <Text fz={20} fw={700} c={NEON}>
-                            с целью — {date(goal.closes_on)}
-                          </Text>
-                        )}
-                        <Button mt="sm" w="fit-content" onClick={go(`#loans/list/${loan.id}`)}>
-                          Открыть кредит
-                        </Button>
-                      </Stack>
-                    </Group>
-                  )}
-                </Scene>
-              );
-            })}
-
-            {goals.some((goal) => !goal.loan_id) && (
-              <Scene label="Кадр 4" title="Цели">
+            {(goals.some((goal) => !goal.loan_id) || (loans ?? []).length > 0) && (
+              <Scene label="Кадр 2" title="Цели и кредиты">
                 {(visible) => (
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing={48}>
                   <Stack gap="xl">
+                    <Text className={classes.label}>Цели</Text>
+                    {!goals.some((goal) => !goal.loan_id) && <Text c="dimmed">Целей пока нет</Text>}
                     {goals
                       .filter((goal) => !goal.loan_id)
                       .map((goal) => {
@@ -435,6 +354,39 @@ export function CinemaPage() {
                         );
                       })}
                   </Stack>
+                  <Stack gap="xl">
+                    <Text className={classes.label}>Кредиты</Text>
+                    {(loans ?? []).length === 0 && <Text c="dimmed">Кредитов нет</Text>}
+                    {(loans ?? []).map((loan) => {
+                      const debt = Number(loan.actual.balance);
+                      const principal = Number(loan.start.balance);
+                      const goal = goals.find((item) => item.loan_id === loan.id);
+                      return (
+                        <Group key={loan.id} align="center" gap={32} wrap="nowrap">
+                          <Ring share={debt / principal} run={visible} />
+                          <Stack gap={4}>
+                            <Text fz={22} fw={800}>
+                              {loan.name}
+                            </Text>
+                            <Text className={classes.label}>осталось долга</Text>
+                            <CountUp value={debt} run={visible} style={{ fontSize: 40, fontWeight: 900 }} />
+                            <Text c="dimmed">
+                              из {rub(principal)} · по графику закроешь {date(loan.actual.close_date)}
+                            </Text>
+                            {goal?.closes_on && (
+                              <Text fz={18} fw={700} c={NEON}>
+                                с целью — {date(goal.closes_on)}
+                              </Text>
+                            )}
+                            <Button mt="xs" w="fit-content" onClick={go(`#loans/list/${loan.id}`)}>
+                              Открыть кредит
+                            </Button>
+                          </Stack>
+                        </Group>
+                      );
+                    })}
+                  </Stack>
+                  </SimpleGrid>
                 )}
               </Scene>
             )}

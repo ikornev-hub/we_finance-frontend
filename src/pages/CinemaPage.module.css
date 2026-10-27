@@ -130,35 +130,14 @@
   font-weight: 400;
 }
 
-.line {
-  width: 100%;
-  height: 260px;
-  overflow: visible;
-}
-
-/* линия «рисуется»: длинный штрих уезжает в ноль */
-.draw {
-  stroke-dasharray: 4000;
-  stroke-dashoffset: 4000;
-  transition: stroke-dashoffset 2.2s ease-in-out;
-}
-
-.drawn {
-  stroke-dashoffset: 0;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .scene,
   .hero,
   .fill,
-  .draw,
   .scroll {
     transition: none;
     animation: none;
     opacity: 1;
     transform: none;
-  }
-  .draw {
-    stroke-dashoffset: 0;
   }
 }
