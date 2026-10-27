@@ -10,6 +10,7 @@ import { useOrSample } from '../../lib/sample';
 import { Panel } from '../Cards';
 import { errorText } from '../ErrorAlert';
 import { monthTitle, shiftMonth, useSelectedMonth } from './common';
+import { limitPatch } from '../../lib/limits';
 
 // Прогноз на 3 месяца по месяцам (Решение 2026-10-27):
 // - траты по категориям — медиана последних 6 полных месяцев выписки;
@@ -61,7 +62,16 @@ interface Row {
   past: boolean; // есть факт за прошлые месяцы
 }
 
-export function ForecastBlock() {
+/** Прогноз на 3 месяца; в Бюджете — с правилом хранения границ и обновлением Бюджета после «граница = прогноз». */
+export function ForecastBlock({
+  disposable = 0,
+  shareIds = new Set<string>(),
+  onChanged,
+}: {
+  disposable?: number;
+  shareIds?: Set<string>;
+  onChanged?: () => void;
+} = {}) {
   const [current] = useSelectedMonth();
   const months = useMemo(() => Array.from({ length: HORIZON }, (_, index) => shiftMonth(current, index + 1)), [current]);
   const data = useOrSample(
@@ -189,9 +199,10 @@ export function ForecastBlock() {
     const amount = Math.ceil(item.median / 100) * 100;
     setBusy(item.id);
     try {
-      await expensesApi.updateCategory(item.id, { target_amount: amount.toFixed(2), target_share: null });
+      await expensesApi.updateCategory(item.id, limitPatch(amount, shareIds.has(item.id), disposable));
       notifications.show({ color: 'teal', title: `${item.name}: граница ${rub(amount)}`, message: 'Подтянута к прогнозу' });
       setTick((value) => value + 1);
+      onChanged?.();
     } catch (error) {
       notifications.show({ color: 'red', title: 'Не сохранилось', message: errorText(error) });
     } finally {

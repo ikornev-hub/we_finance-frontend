@@ -62,7 +62,7 @@ export const TABS: Tab[] = [
     sections: [
       { id: 'month', label: 'Расходы', icon: <IconReportMoney size={size} /> },
       { id: 'budget', label: 'Бюджет и границы', icon: <IconChartPie size={size} />, hidden: true },
-      { id: 'analysis', label: 'Анализ', icon: <IconChartLine size={size} />, hidden: true },
+      { id: 'analysis', label: 'Динамика', icon: <IconChartLine size={size} />, hidden: true },
       { id: 'review', label: 'Без категории', icon: <IconListCheck size={size} />, hidden: true },
       { id: 'import', label: 'Загрузить выписку', icon: <IconFileUpload size={size} />, hidden: true },
       { id: 'categories', label: 'Категории', icon: <IconCategory size={size} />, hidden: true },

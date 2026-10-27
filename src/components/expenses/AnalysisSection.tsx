@@ -9,7 +9,6 @@ import { useOrSample } from '../../lib/sample';
 import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert } from '../ErrorAlert';
 import { monthTitle, shiftMonth, useSelectedMonth } from './common';
-import { ForecastBlock } from './ForecastBlock';
 
 const chartMoney = (value: number) => `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`;
 const SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -51,7 +50,7 @@ export function AnalysisSection() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
-        <PageHeader title="Анализ трат" subtitle="Динамика по месяцам, медиана и выбросы, темп текущего месяца. Медиана — по полным месяцам с выпиской." />
+        <PageHeader title="Динамика трат" subtitle="По месяцам: медиана и выбросы, темп месяца. Медиана — по полным месяцам с выпиской. Прогноз и правка границ — в «Бюджете и границах»." />
         <SegmentedControl
           value={period}
           onChange={setPeriod}
@@ -66,7 +65,6 @@ export function AnalysisSection() {
 
       {analysis.pace && <PaceBlock pace={analysis.pace} />}
 
-      <ForecastBlock />
 
       <Panel title="Группы по месяцам" subtitle="Сколько уходит в каждую группу; «Отложено» — на цели">
         <BarChart

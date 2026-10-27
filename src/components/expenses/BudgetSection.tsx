@@ -11,6 +11,7 @@ import { PageHeader, Panel } from '../Cards';
 import { ErrorAlert, errorText } from '../ErrorAlert';
 import { monthTitle, shiftMonth, useSelectedMonth } from './common';
 import { isShare, limitPatch } from '../../lib/limits';
+import { ForecastBlock } from './ForecastBlock';
 
 // Пульт месяца: на что разложен доход (план) и сколько уже ушло (факт); границы трат
 // и взносы целей правятся здесь же — рублями в поле или ползунком в % располагаемого
@@ -219,7 +220,7 @@ export function BudgetSection() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
-        <PageHeader title="Бюджет" subtitle="Куда идёт доход месяца: обязательные, траты по границам, цели и свободное. Двигай — итог пересчитается сразу." />
+        <PageHeader title="Бюджет и границы" subtitle="Куда идёт доход месяца: обязательные, траты по границам, цели и свободное. Двигай — итог пересчитается сразу." />
       </Group>
 
       <Panel title={`Доход ${monthTitle(month).toLowerCase()}: ${rub(income)}`} subtitle="План — как разложен доход; факт — сколько уже ушло по выписке">
@@ -439,6 +440,15 @@ export function BudgetSection() {
           </Table.Tbody>
         </Table>
       </Panel>
+
+      <ForecastBlock
+        disposable={disposable}
+        shareIds={new Set(data.categories.filter(isShare).map((category) => category.id))}
+        onChanged={() => {
+          report.reload();
+          goalsData.reload();
+        }}
+      />
     </Stack>
   );
 }
