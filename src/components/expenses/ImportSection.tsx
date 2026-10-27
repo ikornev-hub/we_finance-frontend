@@ -52,7 +52,7 @@ function BotWindow({ report }: { report: AiReport }) {
           </Text>
           {report.status === 'ok' && report.suggested > 0 && (
             <Text size="xs" c="dimmed">
-              Его варианты помечены «ИИ». Согласен — просто «Сохранить»; нет — выбери другую категорию.
+              Согласен с вариантами «ИИ» — просто «Сохранить»; нет — выбери другую категорию.
             </Text>
           )}
         </Stack>
