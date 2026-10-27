@@ -22,110 +22,46 @@
   cursor: pointer;
 }
 
-.label {
-  font-size: 15px;
-  paint-order: stroke;
-  stroke: #05080a;
-  stroke-width: 4px;
-}
-
-.big {
-  font-size: 18px;
-  font-weight: 700;
-  paint-order: stroke;
-  stroke: #05080a;
-  stroke-width: 4px;
-}
-
-.labels {
-  opacity: 0;
-  transition: opacity 0.8s ease 1.4s;
-}
-
-.labelsIn {
-  opacity: 1;
-}
-
-/* ---------- купюра ---------- */
-
-.noteWrap {
-  position: relative;
-  padding: 40px 0;
-}
-
-.incomeEdge {
-  position: absolute;
-  top: 18px;
-  bottom: 18px;
-  left: 0;
-  border: 1px dashed rgba(46, 230, 214, 0.5);
-  border-radius: 14px;
-  pointer-events: none;
-}
-
-.incomeEdge span {
-  position: absolute;
-  top: -22px;
-  left: 0;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+.caption {
+  font-size: 13px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #2ee6d6;
+  font-weight: 700;
 }
 
-.overZone {
-  position: absolute;
-  top: 18px;
-  bottom: 18px;
-  right: 0;
+/* карточки описания проявляются после того, как река налилась */
+.card {
+  display: block;
+  padding: 16px 18px;
   border-radius: 14px;
-  border: 1px dashed rgba(255, 77, 94, 0.7);
-  background: repeating-linear-gradient(45deg, rgba(255, 77, 94, 0.18) 0 6px, transparent 6px 14px);
-  pointer-events: none;
-}
-
-.overZone span {
-  position: absolute;
-  bottom: -22px;
-  right: 0;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #ff4d5e;
-  white-space: nowrap;
-}
-
-.note {
-  display: flex;
-  height: 150px;
-}
-
-.piece {
-  position: relative;
-  height: 100%;
-  border: 1px solid;
-  border-radius: 6px;
-  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(2px);
+  color: #f2f5f7;
+  opacity: 0;
+  transform: translateY(16px);
   transition:
-    transform 1s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 1s;
+    opacity 0.6s ease,
+    transform 0.6s ease,
+    border-color 0.2s;
 }
 
-.pieceText {
-  position: absolute;
-  white-space: nowrap;
-  inset: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: opacity 0.6s;
+.cardIn {
+  opacity: 1;
+  transform: none;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
-  .labels,
-  .piece,
-  .pieceText {
+  .card {
     transition: none;
     transform: none;
     opacity: 1;
