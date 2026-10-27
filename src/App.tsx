@@ -1,6 +1,7 @@
 import { Shell } from './components/Shell';
 import { useRoute } from './navigation';
 import { ExpensesPage, type ExpensesSection } from './pages/ExpensesPage';
+import { CinemaPage } from './pages/CinemaPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { useToken } from './lib/session';
@@ -37,7 +38,7 @@ function SignedIn() {
       page = <ServicePage />;
       break;
     default:
-      page = <HomePage />;
+      page = route.section.id === 'cinema' ? <CinemaPage /> : <HomePage />;
   }
 
   // key: при смене раздела страница монтируется заново — без «застрявших» результатов прошлого раздела.

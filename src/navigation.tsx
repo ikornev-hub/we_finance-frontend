@@ -15,6 +15,7 @@ import {
   IconHeartbeat,
   IconHome,
   IconListDetails,
+  IconMovie,
   IconSparkles,
   IconUserEdit,
 } from '@tabler/icons-react';
@@ -47,7 +48,10 @@ export const TABS: Tab[] = [
   {
     id: 'home',
     label: 'Главная',
-    sections: [{ id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> }],
+    sections: [
+      { id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> },
+      { id: 'cinema', label: 'Кино (пилот)', icon: <IconMovie size={size} /> },
+    ],
   },
   {
     id: 'income',
