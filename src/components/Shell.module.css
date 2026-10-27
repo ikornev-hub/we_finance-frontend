@@ -39,15 +39,28 @@
   height: 100%;
 }
 
-/* Планшет и узкий десктоп: вкладкам не хватит половины ширины — месяц по центру свободного места. */
-@media (min-width: 48em) and (max-width: 75em) {
-  .bar {
-    grid-template-columns: auto 1fr auto;
-  }
-}
-
 .left {
   min-width: 0;
+  overflow: hidden;
+}
+
+/* Вкладкам не хватает места (планшет) — они листаются вбок; месяц и ⚙ стоят на месте. */
+.tabs {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs > * {
+  flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .center {

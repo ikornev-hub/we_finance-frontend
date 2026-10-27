@@ -168,7 +168,7 @@ function Todo({ today, until, waiting, goals, loans }: { today: string; until: s
           icon: <IconPigMoney size={18} />,
           text: `${date(day.date)} · отложить ${rub(Number(day.amount))} на «${goal.name}»`,
           action: 'Отложил',
-          onClick: go('#expenses/goals'),
+          onClick: go('#goals'),
         });
       }
     }
@@ -457,7 +457,7 @@ function LoansBlock({ loans, goals }: { loans: LoanDetailOut[] | null; goals: Sa
 function GoalsBlock({ goals, month }: { goals: SavingsGoal[]; month: string }) {
   const list = goals.filter((goal) => !goal.loan_id);
   return (
-    <Panel title="Цели" subtitle="Отложено по фактам; срок против прогноза" actions={<Button size="xs" variant="subtle" onClick={go('#expenses/goals')}>Все →</Button>}>
+    <Panel title="Цели" subtitle="Отложено по фактам; срок против прогноза" actions={<Button size="xs" variant="subtle" onClick={go('#goals')}>Все →</Button>}>
       {list.length === 0 ? (
         <Text size="sm" c="dimmed">
           Целей пока нет

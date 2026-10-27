@@ -23,7 +23,7 @@ import type { ReactNode } from 'react';
 
 // Навигация: вкладки в шапке, разделы вкладки — её выпадающий список (на телефоне — бургер). Адрес: #вкладка/раздел[/параметр].
 
-export type TabId = 'home' | 'income' | 'expenses' | 'loans' | 'calculator' | 'system';
+export type TabId = 'home' | 'expenses' | 'goals' | 'income' | 'loans' | 'accounts' | 'calculator' | 'system';
 
 export interface Section {
   id: string;
@@ -58,25 +58,29 @@ export const TABS: Tab[] = [
     ],
   },
   {
+    // Расходы — одна страница; остальное — её подстраницы, в меню их нет (решение заказчика 2026-10-27).
+    id: 'expenses',
+    label: 'Расходы',
+    sections: [
+      { id: 'month', label: 'Расходы', icon: <IconReportMoney size={size} /> },
+      { id: 'budget', label: 'Бюджет и границы', icon: <IconChartPie size={size} />, hidden: true },
+      { id: 'analysis', label: 'Анализ', icon: <IconChartLine size={size} />, hidden: true },
+      { id: 'review', label: 'Без категории', icon: <IconListCheck size={size} />, hidden: true },
+      { id: 'import', label: 'Загрузить выписку', icon: <IconFileUpload size={size} />, hidden: true },
+      { id: 'categories', label: 'Категории', icon: <IconCategory size={size} />, hidden: true },
+    ],
+  },
+  {
+    id: 'goals',
+    label: 'Цели',
+    sections: [{ id: 'main', label: 'Цели', icon: <IconPigMoney size={size} /> }],
+  },
+  {
     id: 'income',
     label: 'Доходы',
     sections: [
       { id: 'overview', label: 'Отчёт', icon: <IconChartBar size={size} /> },
       { id: 'data', label: 'Мои данные', icon: <IconUserEdit size={size} />, hidden: true },
-    ],
-  },
-  {
-    id: 'expenses',
-    label: 'Расходы',
-    sections: [
-      { id: 'budget', label: 'Бюджет', icon: <IconChartPie size={size} /> },
-      { id: 'month', label: 'Месяц', icon: <IconReportMoney size={size} /> },
-      { id: 'analysis', label: 'Анализ', icon: <IconChartLine size={size} /> },
-      { id: 'goals', label: 'Цели', icon: <IconPigMoney size={size} /> },
-      { id: 'review', label: 'Без категории', icon: <IconListCheck size={size} /> },
-      { id: 'import', label: 'Загрузить выписку', icon: <IconFileUpload size={size} /> },
-      { id: 'categories', label: 'Категории', icon: <IconCategory size={size} /> },
-      { id: 'accounts', label: 'Свои счета', icon: <IconCreditCard size={size} /> },
     ],
   },
   {
@@ -88,6 +92,11 @@ export const TABS: Tab[] = [
       { id: 'create', label: 'Новый кредит', icon: <IconCirclePlus size={size} /> },
       { id: 'calculator', label: 'Калькулятор', icon: <IconCalculator size={size} />, link: 'calculator' },
     ],
+  },
+  {
+    id: 'accounts',
+    label: 'Счета',
+    sections: [{ id: 'main', label: 'Свои счета', icon: <IconCreditCard size={size} /> }],
   },
   {
     id: 'calculator',

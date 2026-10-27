@@ -26,7 +26,7 @@ import classes from './Shell.module.css';
 // на телефоне разделы в бургере. Шапка: меню слева, месяц по центру, ⚙ справа. Шапка прозрачная, контент едет под ней.
 
 /** Экраны, которые показывают выбранный месяц: на них переключатель месяца висит в шапке. */
-const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'expenses/goals', 'expenses/review']);
+const MONTH_SCREENS = new Set(['home/main', 'home/cinema', 'expenses/budget', 'expenses/month', 'goals/main', 'expenses/review']);
 
 const MENU_TABS = TABS.filter((tab) => !tab.hidden);
 const go = (hash: string) => (window.location.hash = hash);
@@ -63,6 +63,21 @@ function useTheme() {
 function TabMenu({ tab, route }: { tab: Tab; route: Route }) {
   const active = activeTab(route) === tab.id;
   const sections = tab.sections.filter((section) => !section.hidden);
+  // Один раздел — список не нужен: клик сразу ведёт на него.
+  if (sections.length === 1) {
+    return (
+      <Button
+        variant={active ? 'light' : 'subtle'}
+        color={active ? 'brand' : 'gray'}
+        radius="xl"
+        className={classes.tab}
+        data-active={active || undefined}
+        onClick={() => go(sectionHref(tab, sections[0]))}
+      >
+        {tab.label}
+      </Button>
+    );
+  }
   return (
     <Menu position="bottom-start" offset={6} radius="md" shadow="lg" withinPortal>
       <Menu.Target>
@@ -128,7 +143,20 @@ function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; c
   return (
     <Drawer opened={opened} onClose={close} size="100%" title={<Text fw={700}>We Finance</Text>} hiddenFrom="sm">
       <ScrollArea.Autosize mah="calc(100dvh - 80px)">
-        {MENU_TABS.map((tab) => (
+        {MENU_TABS.map((tab) => {
+          const sections = tab.sections.filter((section) => !section.hidden);
+          if (sections.length === 1) {
+            return (
+              <NavLink
+                key={tab.id}
+                label={tab.label}
+                fw={600}
+                active={activeTab(route) === tab.id}
+                onClick={() => open(sectionHref(tab, sections[0]))}
+              />
+            );
+          }
+          return (
           <NavLink key={tab.id} label={tab.label} defaultOpened={activeTab(route) === tab.id} childrenOffset={12} fw={600}>
             {tab.sections
               .filter((section) => !section.hidden)
@@ -142,7 +170,8 @@ function MobileMenu({ route, opened, close }: { route: Route; opened: boolean; c
                 />
               ))}
           </NavLink>
-        ))}
+          );
+        })}
       </ScrollArea.Autosize>
     </Drawer>
   );
@@ -166,7 +195,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
             <Box className={classes.logo} visibleFrom="sm" onClick={() => go(href('home'))}>
               WF
             </Box>
-            <Group gap={4} wrap="nowrap" visibleFrom="sm" ml="xs">
+            <Group gap={4} wrap="nowrap" visibleFrom="sm" ml="xs" className={classes.tabs}>
               {MENU_TABS.map((tab) => (
                 <TabMenu key={tab.id} tab={tab} route={route} />
               ))}

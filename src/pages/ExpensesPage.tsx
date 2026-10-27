@@ -17,6 +17,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  IconArrowLeft,
   IconArrowsMove,
   IconCheck,
   IconInfoCircle,
@@ -26,6 +27,7 @@ import {
   IconUpload,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
 import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, RulePreview } from '../api/types';
@@ -63,7 +65,30 @@ const TYPE_LABEL: Record<string, string> = {
   transfer_in: 'Входящий',
 };
 
+/** Подстраница «Расходов»: в меню её нет — сверху дорога назад. */
+function Subpage({ children }: { children: ReactNode }) {
+  return (
+    <Stack gap="xs">
+      <Group>
+        <Button variant="subtle" size="compact-sm" leftSection={<IconArrowLeft size={14} />} onClick={go('month')}>
+          Расходы
+        </Button>
+      </Group>
+      {children}
+    </Stack>
+  );
+}
+
 export function ExpensesPage({ section }: { section: ExpensesSection }) {
+  if (section === 'goals' || section === 'accounts' || section === 'month') return <ExpensesScreen section={section} />;
+  return (
+    <Subpage>
+      <ExpensesScreen section={section} />
+    </Subpage>
+  );
+}
+
+function ExpensesScreen({ section }: { section: ExpensesSection }) {
   switch (section) {
     case 'review':
       return <ReviewSection />;
@@ -101,6 +126,15 @@ function MonthSection() {
       <Group justify="space-between" align="flex-start">
         <PageHeader title="Расходы" subtitle="Куда ушли деньги за месяц: категории, доли от располагаемого дохода, цели и перерасход." />
         <Group gap="sm">
+          <Button variant="subtle" onClick={go('categories')}>
+            Категории
+          </Button>
+          <Button variant="subtle" onClick={go('budget')}>
+            Бюджет и границы
+          </Button>
+          <Button variant="subtle" onClick={go('analysis')}>
+            Анализ
+          </Button>
           <Button variant="default" leftSection={<IconUpload size={16} />} onClick={go('import')}>
             Загрузить выписку
           </Button>

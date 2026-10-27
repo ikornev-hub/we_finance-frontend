@@ -34,6 +34,12 @@ function SignedIn() {
     case 'expenses':
       page = <ExpensesPage section={route.section.id as ExpensesSection} />;
       break;
+    case 'goals':
+      page = <ExpensesPage section="goals" />;
+      break;
+    case 'accounts':
+      page = <ExpensesPage section="accounts" />;
+      break;
     case 'system':
       page = <ServicePage />;
       break;
