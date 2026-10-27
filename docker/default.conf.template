@@ -12,6 +12,8 @@ server {
         proxy_pass ${BACKEND_URL};
         # годовая выписка в PDF — 1–2 МБ; по умолчанию nginx режет всё больше 1 МБ (413)
         client_max_body_size 20m;
+        # проверка выписки ждёт локальную модель ИИ (system/expenses.md §2.10) — до 5 минут, а не 60 секунд
+        proxy_read_timeout 300s;
         proxy_set_header Host $host;
     }
 }
