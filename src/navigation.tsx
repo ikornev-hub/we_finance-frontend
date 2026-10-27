@@ -49,8 +49,9 @@ export const TABS: Tab[] = [
     id: 'home',
     label: 'Главная',
     sections: [
+      // Первый раздел — стартовая страница приложения (решение заказчика 2026-10-27: «Кино»).
+      { id: 'cinema', label: 'Кино', icon: <IconMovie size={size} /> },
       { id: 'main', label: 'Этот месяц', icon: <IconHome size={size} /> },
-      { id: 'cinema', label: 'Кино (пилот)', icon: <IconMovie size={size} /> },
     ],
   },
   {
