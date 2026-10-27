@@ -2,9 +2,30 @@
   background: var(--wf-bg);
 }
 
+/* Прозрачная шапка: контент едет под ней, сквозь — размытый фон. */
 .header {
-  background: var(--wf-card);
-  border-bottom: 1px solid var(--wf-border);
+  background: color-mix(in srgb, var(--wf-bg) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid color-mix(in srgb, var(--wf-border) 60%, transparent);
+}
+
+/* Над «Кино» шапка тёмная в любой теме: сцена видна сквозь неё. */
+.header[data-stage] {
+  background: rgba(3, 5, 7, 0.35);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  color-scheme: dark;
+  --mantine-color-text: #f2f5f7;
+  --mantine-color-dimmed: #8b95a1;
+  --mantine-color-default: rgba(255, 255, 255, 0.06);
+  --mantine-color-default-hover: rgba(255, 255, 255, 0.12);
+  --mantine-color-default-color: #f2f5f7;
+  --mantine-color-default-border: rgba(255, 255, 255, 0.14);
+  --mantine-color-gray-light-color: #c9d1d9;
+  --mantine-color-gray-light-hover: rgba(255, 255, 255, 0.08);
+  --mantine-color-gray-text: #c9d1d9;
+  --mantine-color-gray-filled: #c9d1d9;
+  --burger-color: #f2f5f7;
 }
 
 .logo {
@@ -19,51 +40,19 @@
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.02em;
-}
-
-.tabs {
-  background: var(--wf-bg);
-  border: 1px solid var(--wf-border);
-}
-
-.pill {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--wf-border);
-  background: var(--wf-card);
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.rail {
-  background: var(--wf-card);
-  border-right: 1px solid var(--wf-border);
+/* Планшет: вкладки компактнее, чтобы влезли рядом с месяцем. */
+@media (max-width: 62em) {
+  .tab {
+    padding-inline: 10px;
+    font-size: 13px;
+  }
 }
 
-.railButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  color: var(--mantine-color-dimmed);
-  transition:
-    background 150ms ease,
-    color 150ms ease;
-}
-
-.railButton:hover {
-  background: var(--wf-bg);
-  color: var(--mantine-color-text);
-}
-
-.railButton[data-active] {
-  background: light-dark(var(--mantine-color-dark-7), var(--mantine-color-gray-0));
-  color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-7));
+.current {
+  background: var(--mantine-color-default-hover);
+  font-weight: 600;
 }

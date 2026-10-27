@@ -22,7 +22,7 @@ import {
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
-// Навигация: вкладки сверху, разделы вкладки — иконки в левой колонке. Адрес: #вкладка/раздел[/параметр].
+// Навигация: вкладки в шапке, разделы вкладки — её выпадающий список (на телефоне — бургер). Адрес: #вкладка/раздел[/параметр].
 
 export type TabId = 'home' | 'income' | 'expenses' | 'loans' | 'calculator' | 'system';
 
@@ -30,16 +30,20 @@ export interface Section {
   id: string;
   label: string;
   icon: ReactNode;
-  /** Не показывать в колонке иконок: на раздел ведёт кнопка со страницы. */
+  /** Не показывать в меню: на раздел ведёт кнопка со страницы. */
   hidden?: boolean;
+  /** Пункт меню ведёт на другую вкладку (калькулятор — из «Кредитов»). */
+  link?: TabId;
 }
 
 export interface Tab {
   id: TabId;
   label: string;
   sections: Section[];
-  /** Не показывать в верхних вкладках: вход — по шестерёнке в шапке. */
+  /** Не показывать в шапке: вход — из меню другой вкладки или настроек. */
   hidden?: boolean;
+  /** Чья вкладка подсвечивается в шапке, когда открыта эта. */
+  parent?: TabId;
 }
 
 const size = 20;
@@ -84,11 +88,14 @@ export const TABS: Tab[] = [
       { id: 'list', label: 'Мои кредиты', icon: <IconListDetails size={size} /> },
       { id: 'archive', label: 'Архив', icon: <IconArchive size={size} /> },
       { id: 'create', label: 'Новый кредит', icon: <IconCirclePlus size={size} /> },
+      { id: 'calculator', label: 'Калькулятор', icon: <IconCalculator size={size} />, link: 'calculator' },
     ],
   },
   {
     id: 'calculator',
     label: 'Калькулятор',
+    hidden: true,
+    parent: 'loans',
     sections: [{ id: 'main', label: 'Калькулятор кредита', icon: <IconCalculator size={size} /> }],
   },
   {
@@ -119,6 +126,11 @@ function parse(hash: string): Route {
 
 export function href(tab: TabId, section?: string): string {
   return section ? `#${tab}/${section}` : `#${tab}`;
+}
+
+/** Куда ведёт пункт меню. */
+export function sectionHref(tab: Tab, section: Section): string {
+  return section.link ? href(section.link) : href(tab.id, section.id);
 }
 
 /** Текущий маршрут из адреса; работают «назад/вперёд» браузера и ссылки на раздел. */
