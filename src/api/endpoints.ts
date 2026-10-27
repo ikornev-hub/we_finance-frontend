@@ -2,6 +2,7 @@
 
 import { api, request } from './client';
 import type {
+  BalanceView,
   CategoryChange,
   ImportOverride,
   ImportPreview,
@@ -122,6 +123,7 @@ export const expensesApi = {
   updateGoal: (id: string, goal: SavingsGoalIn) => api.put<SavingsGoal>(`${V1}/expenses/goals/${enc(id)}`, goal),
   deleteGoal: (id: string) => api.delete<null>(`${V1}/expenses/goals/${enc(id)}`),
   addContribution: (id: string, contribution: ContributionIn) => api.post<{ id: string }>(`${V1}/expenses/goals/${enc(id)}/contributions`, contribution),
+  balance: (month: string) => api.get<BalanceView>(`${V1}/expenses/balance/${enc(month)}`),
   analysis: (from: string, to: string) => api.get<SpendingAnalysis>(`${V1}/expenses/analysis`, { from, to }),
   updateGroup: (id: string, patch: GroupPatch) => api.patch<ExpenseGroup>(`${V1}/expenses/groups/${enc(id)}`, patch),
   createCategory: (category: CategoryIn) => api.post<ExpenseCategory>(`${V1}/expenses/categories`, category),

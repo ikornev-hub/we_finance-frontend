@@ -234,6 +234,21 @@ export type OperationType =
   | 'transfer_person'
   | 'transfer_in';
 
+/** Остаток на счёте по дням: факт по выписке и ожидание по плану. */
+export interface BalanceView {
+  month: string;
+  today: IsoDate;
+  /** По какой день есть выписка. */
+  statement_until: IsoDate | null;
+  /** Остаток на конец предыдущего месяца; null — выписки нет. */
+  start_balance: Money | null;
+  actual: { day: IsoDate; balance: Money }[];
+  expected: { day: IsoDate; balance: Money }[];
+  /** Плановые доходы (+) и платежи (−) месяца в свои даты. */
+  events: { day: IsoDate; amount: Money; label: string }[];
+  spending: Money;
+}
+
 /** Новая операция выписки до сохранения: куда система её кладёт и почему. */
 export interface PreviewOperation {
   bank_operation_id: string;
