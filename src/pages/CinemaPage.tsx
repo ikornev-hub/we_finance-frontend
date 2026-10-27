@@ -296,7 +296,7 @@ export function CinemaPage() {
                     today={month === currentMonth() ? Number(balance.today.slice(8, 10)) : null}
                     run={heroIn}
                     animate={!reduced()}
-                    height="clamp(200px, calc(100vh - 620px), 420px)"
+                    height="max(260px, min(420px, calc(100vh - 620px)))"
                   />
                 </div>
               )}
@@ -390,14 +390,14 @@ export function CinemaPage() {
                       const principal = Number(loan.start.balance);
                       const goal = goals.find((item) => item.loan_id === loan.id);
                       return (
-                        <Group key={loan.id} align="center" gap={32} wrap="nowrap">
+                        <Group key={loan.id} align="center" gap={24} wrap="wrap">
                           <Ring share={debt / principal} run={visible} />
                           <Stack gap={4}>
                             <Text fz={22} fw={800}>
                               {loan.name}
                             </Text>
                             <Text className={classes.label}>осталось долга</Text>
-                            <CountUp value={debt} run={visible} style={{ fontSize: 40, fontWeight: 900 }} />
+                            <CountUp value={debt} run={visible} style={{ fontSize: 'clamp(28px, 8vw, 40px)', fontWeight: 900, whiteSpace: 'nowrap' }} />
                             <Text c="dimmed">
                               из {rub(principal)} · по графику закроешь {date(loan.actual.close_date)}
                             </Text>

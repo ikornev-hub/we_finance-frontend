@@ -44,12 +44,15 @@
 .outline {
   margin: 0 0 8px;
   font-size: clamp(36px, 6vw, 72px);
-  line-height: 0.95;
-  font-weight: 900;
+  line-height: 1.05;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.02em;
-  color: transparent;
-  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.06em;
+  /* Контур: заливка цветом сцены поверх обводки. На iPhone системный шрифт собран из наложенных
+     фигур, и прозрачная заливка показывала их стыки внутри букв (жалоба заказчика 2026-10-27). */
+  color: #05080a;
+  -webkit-text-stroke: 2.4px rgba(255, 255, 255, 0.9);
+  paint-order: stroke fill;
 }
 
 .label {
@@ -62,12 +65,14 @@
 
 .title {
   margin: 4px 0 32px;
-  font-size: clamp(32px, 5vw, 64px);
-  font-weight: 900;
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 700;
   text-transform: uppercase;
-  line-height: 1;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.9);
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: #05080a;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.9);
+  paint-order: stroke fill;
 }
 
 .scene {
