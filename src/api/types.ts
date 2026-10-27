@@ -444,6 +444,11 @@ export interface MonthReport {
   forecast: MonthForecast;
   groups: MonthGroup[];
   categories: MonthCategory[];
+  /** Переводы себе — нейтральные: ушло на свои счета / пришло со своих. */
+  transfers_out: Money;
+  transfers_in: Money;
+  /** Прочие поступления: отдали долг, возврат — сверх трат категории. */
+  other_in: Money;
 }
 
 export type IncomeCheckStatus = 'confirmed' | 'mismatch' | 'missing' | 'no_statement' | 'expected';

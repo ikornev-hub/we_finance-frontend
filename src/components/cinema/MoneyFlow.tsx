@@ -7,10 +7,9 @@ import classes from './MoneyFlow.module.css';
 // Кадр «Куда ушли деньги» (решения заказчика 2026-10-27): поток (диаграмма Санки).
 // Сверху — только картинка: доход течёт в группы, группы — в категории; под ней — описание,
 // что из чего сложилось. Наведение на строку описания подсвечивает её путь в потоке, и наоборот.
-// Всё по факту выписки; цели и остаток — тоже. Траты больше дохода — красный «сверх дохода».
+// Всё по факту выписки; сходится с тем, как изменился счёт.
 
 const NEON = '#2ee6d6';
-const RED = '#ff4d5e';
 const COLOR: Record<string, string> = {
   mandatory: '#8a94a6',
   managed: NEON,
@@ -20,7 +19,9 @@ const COLOR: Record<string, string> = {
   goals: '#5cefe2',
   rest: '#7dff9b',
   income: NEON,
-  over: RED,
+  other: '#5cc8ff',
+  savings: '#c9a7ff',
+  over: '#ffb347',
 };
 const rub = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -40,7 +41,11 @@ interface Part {
   note?: string;
 }
 
-/** Доход → группы (+ цели и остаток) → категории; перерасход — второй источник. */
+/** Доход (+ прочие, + из накоплений, + со счёта) → группы трат, отложено, остаток → категории.
+
+Сходится до рубля с тем, как изменился счёт (Решение 2026-10-27): переводы себе и вклады — нейтральны,
+в поток попадают одной суммой «отложено и переложено» или источником «из своих накоплений».
+*/
 function parts(report: MonthReport): { sources: Part[]; groups: Part[]; total: number } {
   const groups: Part[] = report.groups
     .filter((group) => Number(group.amount) > 0)
@@ -60,16 +65,49 @@ function parts(report: MonthReport): { sources: Part[]; groups: Part[]; total: n
       };
     });
   const income = Number(report.income);
-  const saved = Number(report.saved);
-  if (saved > 0)
-    groups.push({ key: 'goals', name: 'Цели', value: saved, color: COLOR.goals, children: [], all: [], note: 'отложено на накопительные счета и вручную' });
+  const other = Number(report.other_in ?? 0);
+  // отложено на вклады и переложено на свои счета — нетто; минус — взято из своих накоплений
+  const reserve = Number(report.saved) + Number(report.transfers_out ?? 0) - Number(report.transfers_in ?? 0);
+  const sources: Part[] = [
+    { key: 'income', name: 'Доход', value: income, color: COLOR.income, children: [], all: [], note: 'зарплата, премии, пособия, кэшбэк' },
+  ];
+  if (other > 0)
+    sources.push({
+      key: 'other',
+      name: 'Прочие поступления',
+      value: other,
+      color: COLOR.other,
+      children: [],
+      all: [],
+      note: 'вернули долг, возвраты за покупки',
+    });
+  if (reserve < 0)
+    sources.push({
+      key: 'savings',
+      name: 'Из своих накоплений',
+      value: -reserve,
+      color: COLOR.savings,
+      children: [],
+      all: [],
+      note: 'со вкладов, экспресс-счёта и своих карт',
+    });
+  if (reserve > 0)
+    groups.push({
+      key: 'goals',
+      name: 'Отложено и переложено',
+      value: reserve,
+      color: COLOR.goals,
+      children: [],
+      all: [],
+      note: 'на вклады, цели и свои счета — не трата',
+    });
   const spent = groups.reduce((sum, group) => sum + group.value, 0);
-  const left = income - spent;
-  if (left > 0) groups.push({ key: 'rest', name: 'Остаток', value: left, color: COLOR.rest, children: [], all: [], note: 'доход − траты − отложено' });
-  const sources: Part[] = [{ key: 'income', name: 'Доход', value: income, color: COLOR.income, children: [], all: [], note: 'пришло по выписке' }];
-  if (left < 0)
-    sources.push({ key: 'over', name: 'Сверх дохода', value: -left, color: COLOR.over, children: [], all: [], note: 'из остатка прошлых месяцев или в долг' });
-  return { sources, groups, total: Math.max(income, spent) };
+  const came = sources.reduce((sum, source) => sum + source.value, 0);
+  const left = came - spent;
+  if (left > 0.5) groups.push({ key: 'rest', name: 'Остаток', value: left, color: COLOR.rest, children: [], all: [], note: 'остался на счёте' });
+  if (left < -0.5)
+    sources.push({ key: 'over', name: 'Со счёта', value: -left, color: COLOR.over, children: [], all: [], note: 'из остатка прошлых месяцев на счёте' });
+  return { sources, groups, total: Math.max(came, spent) };
 }
 
 // ---------- картинка ----------
@@ -153,7 +191,7 @@ function Flow({
       links.push({
         id: `${sources[s].key}-${group.key}`,
         keys: [group.key, sources[s].key],
-        color: sources[s].key === 'over' ? RED : group.color,
+        color: sources[s].key === 'income' ? group.color : sources[s].color,
         value: take,
         d: ribbon(X[0] + NODE, a0, a0 + take * k, X[1], b0, b0 + take * k),
         center: centerLine(X[0] + NODE, a0 + (take * k) / 2, X[1], b0 + (take * k) / 2),
