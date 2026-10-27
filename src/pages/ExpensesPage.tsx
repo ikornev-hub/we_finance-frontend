@@ -4,7 +4,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  FileInput,
   Group,
   Modal,
   NumberInput,
@@ -20,7 +19,6 @@ import { notifications } from '@mantine/notifications';
 import {
   IconArrowsMove,
   IconCheck,
-  IconFileSpreadsheet,
   IconInfoCircle,
   IconListSearch,
   IconPlus,
@@ -30,13 +28,14 @@ import {
 import { useEffect, useState } from 'react';
 
 import { expensesApi, loansApi } from '../api/endpoints';
-import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, ImportResult, RulePreview } from '../api/types';
+import type { AccountKind, ExpenseAccountIn, ExpenseGroup, LoanSummaryOut, SavingsGoal, ExpenseCategory, ExpenseOperation, RulePreview } from '../api/types';
 import { PageHeader, Panel } from '../components/Cards';
 import { ErrorAlert, errorText } from '../components/ErrorAlert';
 import { CategorySelect, MonthSwitch, SampleNotice, categoryOptions, monthTitle, useSelectedMonth } from '../components/expenses/common';
 import { AnalysisSection } from '../components/expenses/AnalysisSection';
 import { BudgetSection } from '../components/expenses/BudgetSection';
 import { GoalsSection } from '../components/expenses/GoalsSection';
+import { ImportSection } from '../components/expenses/ImportSection';
 import { ForecastPanel, GROUP_HINT, MonthTotals, MonthTree } from '../components/expenses/MonthView';
 import { confirmAction } from '../lib/confirm';
 import {
@@ -435,84 +434,6 @@ function SimilarList({ preview }: { preview: RulePreview }) {
 }
 
 // ---------- загрузить выписку ----------
-
-function ImportSection() {
-  const [bank, setBank] = useState('alfa');
-  const [file, setFile] = useState<File | null>(null);
-  const upload = useAction<ImportResult>();
-  const [waiting, setWaiting] = useState<number | null>(null);
-
-  const send = async (chosen: File) => {
-    setWaiting(null);
-    const result = await upload.run(() => expensesApi.importStatement(bank, chosen));
-    if (result) {
-      // Всего ждут разбора — не только новые из этого файла (#20).
-      expensesApi
-        .operations({ uncategorized: true })
-        .then((list) => setWaiting(list.length))
-        .catch(() => setWaiting(null));
-    }
-  };
-
-  return (
-    <Stack gap="lg">
-      <PageHeader title="Загрузить выписку" subtitle="Раз в месяц: выгрузи выписку в банке и загрузи сюда. Уже загруженные операции не задвоятся." />
-      <Panel>
-        <Stack gap="md">
-          <SegmentedControl
-            value={bank}
-            onChange={setBank}
-            data={[
-              { value: 'alfa', label: 'Альфа-Банк (XLSX или PDF)' },
-              { value: 'ozon', label: 'Озон Банк (PDF) — скоро', disabled: true },
-            ]}
-          />
-          <FileInput
-            label="Файл выписки"
-            placeholder="Выбери файл"
-            accept=".xlsx,.pdf"
-            value={file}
-            onChange={setFile}
-            leftSection={<IconFileSpreadsheet size={16} />}
-            radius="md"
-            clearable
-          />
-          <Group>
-            <Button leftSection={<IconUpload size={16} />} disabled={!file} loading={upload.loading} onClick={() => file && send(file)}>
-              Загрузить
-            </Button>
-          </Group>
-          <ErrorAlert error={upload.error} />
-          {upload.data && (
-            <Alert color="teal" radius="lg" variant="light" icon={<IconCheck size={18} />} title="Выписка загружена">
-              <Stack gap="xs">
-                <Text size="sm">
-                  Операций: <b>{upload.data.total}</b> · новых: <b>{upload.data.new}</b> · уже были: <b>{upload.data.duplicates}</b> · из новых без категории:{' '}
-                  <b>{upload.data.uncategorized}</b>
-                </Text>
-                {waiting !== null && (
-                  <Text size="sm">
-                    Всего ждут разбора: <b>{waiting}</b>
-                  </Text>
-                )}
-                <Group gap="sm">
-                  {(waiting ?? upload.data.uncategorized) > 0 && (
-                    <Button size="xs" color="orange" variant="light" onClick={go('review')}>
-                      Разобрать без категории
-                    </Button>
-                  )}
-                  <Button size="xs" variant="light" onClick={go('month')}>
-                    К месяцу
-                  </Button>
-                </Group>
-              </Stack>
-            </Alert>
-          )}
-        </Stack>
-      </Panel>
-    </Stack>
-  );
-}
 
 // ---------- категории ----------
 

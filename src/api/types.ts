@@ -234,6 +234,38 @@ export type OperationType =
   | 'transfer_person'
   | 'transfer_in';
 
+/** Новая операция выписки до сохранения: куда система её кладёт и почему. */
+export interface PreviewOperation {
+  bank_operation_id: string;
+  day: IsoDate;
+  amount: Money;
+  description: string;
+  merchant: string | null;
+  counterparty: string | null;
+  type: string;
+  category_id: string | null;
+  category: string | null;
+  /** «правило: …», «MCC 5411», «справочник: …», «перевод человеку — реши сам», «не распознано». */
+  reason: string;
+  can_remember: boolean;
+}
+
+/** Проверка выписки перед сохранением. */
+export interface ImportPreview {
+  period_from: IsoDate | null;
+  period_to: IsoDate | null;
+  total: number;
+  new: number;
+  duplicates: number;
+  operations: PreviewOperation[];
+}
+
+export interface ImportOverride {
+  bank_operation_id: string;
+  category_id: string;
+  remember: boolean;
+}
+
 export interface ImportResult {
   import_id: string;
   total: number;

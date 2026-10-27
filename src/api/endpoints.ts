@@ -3,6 +3,8 @@
 import { api, request } from './client';
 import type {
   CategoryChange,
+  ImportOverride,
+  ImportPreview,
   LoanGoalPreview,
   CategoryIn,
   ExpenseAccount,
@@ -86,10 +88,19 @@ export const calculatorApi = {
 const enc = encodeURIComponent;
 
 export const expensesApi = {
-  importStatement: (bank: string, file: File) => {
+  /** Разобрать выписку и показать новые операции с категориями — в базу ничего не пишет. */
+  previewImport: (bank: string, file: File) => {
     const form = new FormData();
     form.append('bank', bank);
     form.append('file', file);
+    return api.post<ImportPreview>(`${V1}/expenses/imports/preview`, form);
+  },
+  /** Сохранить проверенную выписку: тот же файл + правки категорий. */
+  importStatement: (bank: string, file: File, overrides: ImportOverride[] = []) => {
+    const form = new FormData();
+    form.append('bank', bank);
+    form.append('file', file);
+    form.append('overrides', JSON.stringify(overrides));
     return api.post<ImportResult>(`${V1}/expenses/imports`, form);
   },
   operations: (query: { month?: string; category_id?: string; uncategorized?: boolean }) =>
